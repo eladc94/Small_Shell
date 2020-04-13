@@ -4,7 +4,7 @@
 #include "Commands.h"
 
 using namespace std;
-Tomer BEITZA
+Tomer
 void ctrlZHandler(int sig_num) {
 	// TODO: Add your implementation
 }
