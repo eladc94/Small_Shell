@@ -4,7 +4,7 @@
 #include "Commands.h"
 
 using namespace std;
-Tomer
+
 void ctrlZHandler(int sig_num) {
 	// TODO: Add your implementation
 }
@@ -17,3 +17,4 @@ void alarmHandler(int sig_num) {
   // TODO: Add your implementation
 }
 
+Tomer
