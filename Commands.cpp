@@ -105,6 +105,59 @@ void _removeBackgroundSign(char* cmd_line) {
     }
 }*/
 
+void ShowPidCommand::execute() {
+    std::cout << "smash pid is: " << getPid() << std::endl;
+}
+
+void GetCurrDirCommand::execute() {
+    char* path = getcwd(NULL,0);
+    if (NULL == path){
+        perror("smash error: getcwd failed");
+        return;
+    }
+    std::cout << path << std::endl;
+    free(path);
+}
+
+void ChangeDirCommand::execute() {
+    char* args[MAX_ARGUMENTS];
+    int numOfArgs = _parseCommandLine(this->cmd_line, args);
+    char* cur = getcwd(NULL,0);
+    if (numOfArgs > 2){
+        perror("smash error: cd: too many arguments");
+        return;
+    }
+    if (args[1] == "-"){ // if "-" was sent
+        if (NULL == *plastPwd) {
+            perror("smash error: cd: OLDPWD not set");
+            return;
+        }
+        else{
+            if (NULL == cur){
+                perror("smash error: getcwd failed");
+                return;
+            }
+            int flag = chdir(*plastPwd);
+            if (flag != 0) {
+                free(cur);
+                perror("smash error: chdir failed");
+                return;
+            }
+            strcpy(*plastPwd, cur);
+            free(cur);
+            return;
+        }
+    }
+    int flag = chdir(args[1]);
+    if (flag != 0){
+        perror("smash error: chdir failed");
+        free(cur);
+        return;
+    }
+    strcpy(*plastPwd, cur);
+    free(cur);
+}
+
 void ChangePromptCommand::execute() {
     char* args[MAX_ARGUMENTS];
     int numOfArgs = _parseCommandLine(this->cmd_line, args);
@@ -175,7 +228,7 @@ void JobsList::printJobsList() {
     list<JobEntry> temp = job_list;
     temp.sort();
     for (i = temp.begin(); i != temp.end(); ++i){
-        std::cout<<(*i)<<"\n";
+        std::cout<<(*i)<<endl;
     }
 }
 

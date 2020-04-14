@@ -65,23 +65,24 @@ public:
 };
 
 class ChangeDirCommand : public BuiltInCommand {
-// TODO: Add your data members
+    const char* cmd_line;
+    char** plastPwd;
 public:
-    ChangeDirCommand(const char* cmd_line, char** plastPwd);
+    ChangeDirCommand(const char* cmd_line, char** plastPwd): BuiltInCommand(cmd_line), plastPwd(plastPwd){}
     ~ChangeDirCommand() override = default;
     void execute() override;
 };
 
 class GetCurrDirCommand : public BuiltInCommand {
 public:
-    GetCurrDirCommand(const char* cmd_line);
+    GetCurrDirCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
     ~GetCurrDirCommand() override = default;
     void execute() override;
 };
 
 class ShowPidCommand : public BuiltInCommand {
 public:
-    ShowPidCommand(const char* cmd_line);
+    ShowPidCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
     ~ShowPidCommand() override = default;
     void execute() override;
 };
@@ -205,6 +206,7 @@ class SmallShell {
 private:
     JobsList jobs;
     string prompt;
+    char* previous_path;
     SmallShell();
 public:
     Command *CreateCommand(const char* cmd_line);
