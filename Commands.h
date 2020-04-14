@@ -2,7 +2,7 @@
 #define SMASH_COMMAND_H_
 
 #include <vector>
-
+using std::string;
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
@@ -165,7 +165,8 @@ class CopyCommand : public BuiltInCommand {
 
 class SmallShell {
  private:
-  // TODO: Add your data members
+  JobsList jobs;
+  string prompt;
   SmallShell();
  public:
   Command *CreateCommand(const char* cmd_line);
