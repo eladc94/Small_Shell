@@ -21,7 +21,7 @@ const std::string WHITESPACE = " \n\r\t\f\v";
 #define FUNC_ENTRY()
 #define FUNC_EXIT()
 #endif
-
+#define MAX_ARGUMENTS 20
 #define DEBUG_PRINT cerr << "DEBUG: "
 
 #define EXEC(path, arg) \
@@ -84,6 +84,16 @@ void _removeBackgroundSign(char* cmd_line) {
 
 // TODO: Add your implementation for classes in Commands.h 
 
+void ChangePromptCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    char* args[MAX_ARGUMENTS];
+    int numOfArgs = _parseCommandLine(this->cmd_line, args);
+    if (numOfArgs == 0)
+        smash.setPrompt("smash");
+    else
+        smash.setPrompt(args[0]);
+}
+
 SmallShell::SmallShell() {
 // TODO: add your implementation
 }
@@ -92,6 +102,10 @@ SmallShell::~SmallShell() {
 // TODO: add your implementation
 }
 
+void SmallShell::setPrompt(const char *prompt) {
+    this->prompt = prompt;
+    this->prompt += ">";
+}
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */

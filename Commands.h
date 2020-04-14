@@ -8,7 +8,8 @@ using std::string;
 #define HISTORY_MAX_RECORDS (50)
 
 class Command {
-// TODO: Add your data members
+protected:
+    const char* cmd_line;
  public:
   Command(const char* cmd_line);
   virtual ~Command();
@@ -162,6 +163,12 @@ class CopyCommand : public BuiltInCommand {
 
 // TODO: add more classes if needed 
 // maybe chprompt , timeout ?
+class ChangePromptCommand : public BuiltInCommand {
+public:
+    ChangePromptCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
+    virtual ~ChangePromptCommand(){}
+    void execute() override;
+};
 
 class SmallShell {
  private:
@@ -180,6 +187,7 @@ class SmallShell {
   }
   ~SmallShell();
   void executeCommand(const char* cmd_line);
+  void setPrompt(const char* prompt);
   // TODO: add extra methods as needed
 };
 
