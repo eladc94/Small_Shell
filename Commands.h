@@ -132,6 +132,7 @@ public:
 private:
     list<JobEntry> job_list;
     JobEntry* foreground;
+    tomer;
 public:
     JobsList()= default;
     ~JobsList()= default;
