@@ -10,6 +10,8 @@
 using namespace std;
 
 const std::string WHITESPACE = " \n\r\t\f\v";
+const char* CHDIR_PREV = "-";
+const int CHDIR_MAX_ARG=2;
 
 #if 0
 #define FUNC_ENTRY()  \
@@ -59,7 +61,7 @@ int _parseCommandLine(const char* cmd_line, char** args) {
   FUNC_EXIT()
 }
 
-bool _isBackgroundComamnd(const char* cmd_line) {
+bool _isBackgroundCommand(const char* cmd_line) {
   const string str(cmd_line);
   return str[str.find_last_not_of(WHITESPACE)] == '&';
 }
@@ -88,7 +90,7 @@ void _removeBackgroundSign(char* cmd_line) {
     SmallShell& smash = SmallShell::getInstance();
     char* args[MAX_ARGUMENTS];
     _parseCommandLine(cmd_line, args);
-    if(_isBackgroundComamnd(cmd_line)){
+    if(_isBackgroundCommand(cmd_line)){
         pid_t pid = fork();
         if (pid == 0)
             execv("/bin/bash", args);
@@ -122,40 +124,33 @@ void GetCurrDirCommand::execute() {
 void ChangeDirCommand::execute() {
     char* args[MAX_ARGUMENTS];
     int numOfArgs = _parseCommandLine(this->cmd_line, args);
-    char* cur = getcwd(NULL,0);
-    if (numOfArgs > 2){
+    if (numOfArgs > CHDIR_MAX_ARG){
         perror("smash error: cd: too many arguments");
         return;
     }
-    if (args[1] == "-"){ // if "-" was sent
+    //maybe 0 arguments error
+    char* curr = getcwd(NULL, 0);
+    if(NULL == curr){
+        perror("smash error: getcwd failed");
+    }
+    char * dst;
+    if (strcmp(args[1],CHDIR_PREV) == 0) { // if "-" was sent
         if (NULL == *plastPwd) {
             perror("smash error: cd: OLDPWD not set");
+            free(curr);
             return;
         }
-        else{
-            if (NULL == cur){
-                perror("smash error: getcwd failed");
-                return;
-            }
-            int flag = chdir(*plastPwd);
-            if (flag != 0) {
-                free(cur);
-                perror("smash error: chdir failed");
-                return;
-            }
-            strcpy(*plastPwd, cur);
-            free(cur);
-            return;
-        }
-    }
-    int flag = chdir(args[1]);
-    if (flag != 0){
+        dst = *plastPwd;
+    } else
+        dst=args[1];
+    int flag = chdir(dst);
+    if (flag != 0) {
+        free(curr);
         perror("smash error: chdir failed");
-        free(cur);
         return;
     }
-    strcpy(*plastPwd, cur);
-    free(cur);
+    strcpy(*plastPwd, curr);
+    free(curr);
 }
 
 void ChangePromptCommand::execute() {
@@ -164,7 +159,7 @@ void ChangePromptCommand::execute() {
     if (numOfArgs == 0)
         (*new_prompt)="smash>";
     else {
-        (*new_prompt) = args[0];
+        (*new_prompt) = args[1];
         (*new_prompt)+=">";
     }
 }
@@ -180,6 +175,7 @@ bool operator<(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2){
     return je1.job_id<je2.job_id;
 }
 
+//might need to change this, if we remove pid from Command class
 ostream& operator<<(ostream& os, const JobsList::JobEntry& job){
     os<<job.cmd->getCommandLine()<<" : "<<job.cmd->getPid()<<" ";
     time_t curr_time=time(NULL);
@@ -194,7 +190,7 @@ int JobsList::getMaxJobId() const {
     list<JobEntry>::const_iterator i;
     int max = -1;
     if (this->job_list.empty())
-        return 1;
+        return 1; //why 1?
     for (i = job_list.begin(); i != job_list.end(); ++i){
         if ((*i).job_id > max)
             max = (*i).job_id;
@@ -219,8 +215,10 @@ void JobsList::addJob(Command *cmd, bool isStopped) {
 void JobsList::removeJobById(int jobId) {
     list<JobEntry>::const_iterator i;
     for(i=this->job_list.begin();i!=this->job_list.end();i++)
-        if(i->job_id==jobId)
+        if(i->job_id==jobId) {
             job_list.erase(i);
+            return;
+        }
 }
 
 void JobsList::printJobsList() {
@@ -231,13 +229,14 @@ void JobsList::printJobsList() {
         std::cout<<(*i)<<endl;
     }
 }
-
+//problem here!!
 JobsList::JobEntry* JobsList::getLastJob(int* lastJobId){
     JobEntry last = job_list.back();
     *lastJobId = last.job_id;
     return &last;
 }
 
+//i think there is a problem here , think we need reverse_iterator
 JobsList::JobEntry* JobsList::getLastStoppedJob(int *jobId) {
     list<JobEntry>::iterator i;
     for (i = job_list.end(); i != job_list.begin(); --i){
