@@ -2,10 +2,20 @@
 #define SMASH_COMMAND_H_
 
 #include <vector>
+#include <iostream>
+#include <list>
+#include <time.h>
 using std::string;
+using std::list;
+using std::ostream;
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
+
+enum Status{
+    Running,
+    Stopped
+};
 
 class Command {
 protected:
@@ -16,6 +26,7 @@ protected:
   virtual void execute() = 0;
   //virtual void prepare();
   //virtual void cleanup();
+  const char* getCommandLine() const {return cmd_line;}
   // TODO: Add your extra methods if needed
 };
 
@@ -101,39 +112,52 @@ class HistoryCommand : public BuiltInCommand {
 };
 
 class JobsList {
- public:
-  class JobEntry {
-   // TODO: Add your data members
-  };
- // TODO: Add your data members
- public:
-  JobsList();
-  ~JobsList();
-  void addJob(Command* cmd, bool isStopped = false);
-  void printJobsList();
-  void killAllJobs();
-  void removeFinishedJobs();
-  JobEntry * getJobById(int jobId);
-  void removeJobById(int jobId);
-  JobEntry * getLastJob(int* lastJobId);
-  JobEntry *getLastStoppedJob(int *jobId);
-  // TODO: Add extra methods or modify exisitng ones as needed
+public:
+    class JobEntry {
+        string cmd_line;
+        int pid;
+        int job_id;
+        Status status;
+        time_t start_time;
+    public:
+        JobEntry(const char* cmd_line,int pid,int job_id) : cmd_line(cmd_line),pid(pid),job_id(job_id)
+        ,status(Running),start_time(time(NULL)){}
+
+        friend bool operator==(const JobEntry& je1,const JobEntry& je2);
+        friend bool operator<(const JobEntry& je1,const JobEntry& je2);
+        friend ostream& operator<<(ostream& os,const JobEntry& je);
+    };
+private:
+    list<JobEntry> job_list;
+public:
+    JobsList()= default;
+    ~JobsList()= default;
+    void addJob(Command* cmd, bool isStopped = false);
+    void printJobsList();
+    void killAllJobs();
+    void removeFinishedJobs();
+    JobEntry * getJobById(int jobId);
+    void removeJobById(int jobId);
+    JobEntry * getLastJob(int* lastJobId);
+    JobEntry *getLastStoppedJob(int *jobId);
+    int getMaxJobId() const;
+
 };
 
 class JobsCommand : public BuiltInCommand {
  // TODO: Add your data members
- public:
-  JobsCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~JobsCommand() {}
-  void execute() override;
+public:
+    JobsCommand(const char* cmd_line, JobsList* jobs);
+    virtual ~JobsCommand() {}
+    void execute() override;
 };
 
 class KillCommand : public BuiltInCommand {
  // TODO: Add your data members
- public:
-  KillCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~KillCommand() {}
-  void execute() override;
+public:
+    KillCommand(const char* cmd_line, JobsList* jobs);
+    virtual ~KillCommand() {}
+    void execute() override;
 };
 
 class ForegroundCommand : public BuiltInCommand {
