@@ -84,14 +84,35 @@ void _removeBackgroundSign(char* cmd_line) {
 
 // TODO: Add your implementation for classes in Commands.h 
 
+/*void ExternalCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    char* args[MAX_ARGUMENTS];
+    _parseCommandLine(cmd_line, args);
+    if(_isBackgroundComamnd(cmd_line)){
+        pid_t pid = fork();
+        if (pid == 0)
+            execv("/bin/bash", args);
+        else{
+            smash.getJobList()->addJob(this);
+        }
+    }
+    else{
+        pid_t pid = fork();
+        if (pid == 0)
+            execv("/bin/bash", args);
+        else
+            waitpid(pid, NULL, 0);
+    }
+}*/
+
 void ChangePromptCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     char* args[MAX_ARGUMENTS];
     int numOfArgs = _parseCommandLine(this->cmd_line, args);
-    if (numOfArgs == 0)
+    if (numOfArgs == 1)
         smash.setPrompt("smash");
     else
-        smash.setPrompt(args[0]);
+        smash.setPrompt(args[1]);
 }
 bool operator==(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2){
     return je1.job_id==je2.job_id;
@@ -134,6 +155,7 @@ void JobsList::addJob(Command *cmd, bool isStopped) {
         job_list.push_back(new_job);
     }
     else{
+        foreground->start_time = time(NULL);
         this->foreground->status=Stopped;
         job_list.push_back(*foreground);
         foreground=nullptr;

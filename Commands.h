@@ -121,7 +121,7 @@ public:
     class JobEntry {
         const Command* cmd;
         const int job_id;
-        const time_t start_time;
+        time_t start_time;
         Status status;
     public:
         JobEntry(Command* cmd,int job_id) :cmd(cmd),job_id(job_id),start_time(time(NULL)),status(Running){}
@@ -215,6 +215,7 @@ public:
   ~SmallShell();
   void executeCommand(const char* cmd_line);
   void setPrompt(const char* prompt);
+  JobsList* getJobList();
   // TODO: add extra methods as needed
 };
 
