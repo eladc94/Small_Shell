@@ -93,7 +93,40 @@ void ChangePromptCommand::execute() {
     else
         smash.setPrompt(args[0]);
 }
+bool operator==(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2){
+    return je1.job_id==je2.job_id;
+}
 
+bool operator!=(const JobsList::JobEntry& je1, const JobsList::JobEntry& je2){
+    return !(je1==je2);
+}
+
+bool operator<(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2){
+    return je1.job_id<je2.job_id;
+}
+
+ostream& operator<<(ostream& os, const JobsList::JobEntry& job){
+    os<<job.cmd->getCommandLine()<<" : "<<job.cmd->getPid()<<" ";
+    time_t curr_time=time(NULL);
+    int elapsed=(int)(difftime(job.start_time,curr_time));
+    os<<elapsed<<" secs";
+    if(job.status==Stopped)
+        os<<" (stopped)";
+    return os;
+}
+
+void JobsList::addJob(Command *cmd, bool isStopped) {
+    if(!isStopped) {
+        int new_job_id = this->getMaxJobId() + 1;
+        JobEntry new_job = JobEntry(cmd, new_job_id);
+        job_list.push_back(new_job);
+    }
+    else{
+        foreground->status=Stopped;
+        job_list.push_back(*foreground);
+        foreground=nullptr;
+    }
+}
 SmallShell::SmallShell() {
 // TODO: add your implementation
 }

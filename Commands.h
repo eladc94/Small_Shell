@@ -20,6 +20,7 @@ enum Status{
 class Command {
 protected:
     const char* cmd_line;
+    int pid;
  public:
   Command(const char* cmd_line);
   virtual ~Command();
@@ -27,6 +28,7 @@ protected:
   //virtual void prepare();
   //virtual void cleanup();
   const char* getCommandLine() const {return cmd_line;}
+  int getPid() const {return pid};
   // TODO: Add your extra methods if needed
 };
 
@@ -114,21 +116,22 @@ class HistoryCommand : public BuiltInCommand {
 class JobsList {
 public:
     class JobEntry {
-        string cmd_line;
-        int pid;
-        int job_id;
+        const Command* cmd;
+        const int job_id;
+        const time_t start_time;
         Status status;
-        time_t start_time;
     public:
-        JobEntry(const char* cmd_line,int pid,int job_id) : cmd_line(cmd_line),pid(pid),job_id(job_id)
-        ,status(Running),start_time(time(NULL)){}
+        JobEntry(Command* cmd,int job_id) :cmd(cmd),job_id(job_id),start_time(time(NULL)),status(Running){}
 
-        friend bool operator==(const JobEntry& je1,const JobEntry& je2);
+        friend bool operator==(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2);
+        friend bool operator!=(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2);
         friend bool operator<(const JobEntry& je1,const JobEntry& je2);
         friend ostream& operator<<(ostream& os,const JobEntry& je);
+        friend class JobsList;
     };
 private:
     list<JobEntry> job_list;
+    JobEntry* foreground;
 public:
     JobsList()= default;
     ~JobsList()= default;
@@ -141,6 +144,8 @@ public:
     JobEntry * getLastJob(int* lastJobId);
     JobEntry *getLastStoppedJob(int *jobId);
     int getMaxJobId() const;
+
+
 
 };
 
