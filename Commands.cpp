@@ -85,13 +85,14 @@ void _removeBackgroundSign(char* cmd_line) {
 // TODO: Add your implementation for classes in Commands.h 
 
 void ChangePromptCommand::execute() {
-    SmallShell& smash = SmallShell::getInstance();
     char* args[MAX_ARGUMENTS];
     int numOfArgs = _parseCommandLine(this->cmd_line, args);
     if (numOfArgs == 0)
-        smash.setPrompt("smash");
-    else
-        smash.setPrompt(args[0]);
+        (*new_prompt)="smash>";
+    else {
+        (*new_prompt) = args[0];
+        (*new_prompt)+=">";
+    }
 }
 bool operator==(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2){
     return je1.job_id==je2.job_id;
