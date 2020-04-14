@@ -134,10 +134,17 @@ void JobsList::addJob(Command *cmd, bool isStopped) {
         job_list.push_back(new_job);
     }
     else{
-        foreground->status=Stopped;
+        this->foreground->status=Stopped;
         job_list.push_back(*foreground);
         foreground=nullptr;
     }
+}
+
+void JobsList::removeJobById(int jobId) {
+    list<JobEntry>::const_iterator i;
+    for(i=this->job_list.begin();i!=this->job_list.end();i++)
+        if(i->job_id==jobId)
+            job_list.erase(i);
 }
 
 void JobsList::printJobsList() {
