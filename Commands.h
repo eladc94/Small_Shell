@@ -24,7 +24,7 @@ protected:
     int pid;
 public:
     Command(const char* cmd_line);
-    virtual ~Command();
+    virtual ~Command()= default;
     virtual void execute() = 0;
     //virtual void prepare();
     //virtual void cleanup();
@@ -36,13 +36,13 @@ public:
 class BuiltInCommand : public Command {
 public:
     BuiltInCommand(const char* cmd_line);
-    virtual ~BuiltInCommand() {}
+    ~BuiltInCommand() override =default;
 };
 
 class ExternalCommand : public Command {
 public:
     ExternalCommand(const char* cmd_line);
-    virtual ~ExternalCommand() {}
+    ~ExternalCommand() override = default;
     void execute() override;
 };
 
@@ -50,7 +50,7 @@ class PipeCommand : public Command {
   // TODO: Add your data members
 public:
     PipeCommand(const char* cmd_line);
-    virtual ~PipeCommand() {}
+    ~PipeCommand() override = default;
     void execute() override;
 };
 
@@ -58,7 +58,7 @@ class RedirectionCommand : public Command {
  // TODO: Add your data members
 public:
     explicit RedirectionCommand(const char* cmd_line);
-    virtual ~RedirectionCommand() {}
+    ~RedirectionCommand() override = default;
     void execute() override;
   //void prepare() override;
   //void cleanup() override;
@@ -68,21 +68,21 @@ class ChangeDirCommand : public BuiltInCommand {
 // TODO: Add your data members
 public:
     ChangeDirCommand(const char* cmd_line, char** plastPwd);
-    virtual ~ChangeDirCommand() {}
+    ~ChangeDirCommand() override = default;
     void execute() override;
 };
 
 class GetCurrDirCommand : public BuiltInCommand {
 public:
     GetCurrDirCommand(const char* cmd_line);
-    virtual ~GetCurrDirCommand() {}
+    ~GetCurrDirCommand() override = default;
     void execute() override;
 };
 
 class ShowPidCommand : public BuiltInCommand {
 public:
     ShowPidCommand(const char* cmd_line);
-    virtual ~ShowPidCommand() {}
+    ~ShowPidCommand() override = default;
     void execute() override;
 };
 
@@ -91,7 +91,7 @@ class QuitCommand : public BuiltInCommand {
 // TODO: Add your data members
 public:
     QuitCommand(const char* cmd_line, JobsList* jobs);
-    virtual ~QuitCommand() {}
+    ~QuitCommand() override = default;
     void execute() override;
 };
 
@@ -103,7 +103,7 @@ protected:
  // TODO: Add your data members
 public:
     CommandsHistory();
-    ~CommandsHistory() {}
+    ~CommandsHistory()  =default;
     void addRecord(const char* cmd_line);
     void printHistory();
 };
@@ -112,7 +112,7 @@ class HistoryCommand : public BuiltInCommand {
  // TODO: Add your data members
 public:
     HistoryCommand(const char* cmd_line, CommandsHistory* history);
-    virtual ~HistoryCommand() {}
+    ~HistoryCommand() override = default;
     void execute() override;
 };
 
@@ -153,7 +153,7 @@ class JobsCommand : public BuiltInCommand {
  // TODO: Add your data members
 public:
     JobsCommand(const char* cmd_line, JobsList* jobs);
-    virtual ~JobsCommand() {}
+    ~JobsCommand() override = default;
     void execute() override;
 };
 
@@ -161,7 +161,7 @@ class KillCommand : public BuiltInCommand {
  // TODO: Add your data members
 public:
     KillCommand(const char* cmd_line, JobsList* jobs);
-    virtual ~KillCommand() {}
+    ~KillCommand() override = default;
     void execute() override;
 };
 
@@ -169,7 +169,7 @@ class ForegroundCommand : public BuiltInCommand {
  // TODO: Add your data members
 public:
     ForegroundCommand(const char* cmd_line, JobsList* jobs);
-    virtual ~ForegroundCommand() {}
+    ~ForegroundCommand() override = default;
     void execute() override;
 };
 
@@ -177,7 +177,7 @@ class BackgroundCommand : public BuiltInCommand {
  // TODO: Add your data members
 public:
     BackgroundCommand(const char* cmd_line, JobsList* jobs);
-    virtual ~BackgroundCommand() {}
+    ~BackgroundCommand() override = default;
     void execute() override;
 };
 
@@ -186,16 +186,18 @@ public:
 class CopyCommand : public BuiltInCommand {
 public:
     CopyCommand(const char* cmd_line);
-    virtual ~CopyCommand() {}
+    ~CopyCommand() override = default;
     void execute() override;
 };
 
 // TODO: add more classes if needed 
 // maybe chprompt , timeout ?
 class ChangePromptCommand : public BuiltInCommand {
+    string* new_prompt;
 public:
-    ChangePromptCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
-    virtual ~ChangePromptCommand(){}
+    ChangePromptCommand(const char* cmd_line,string* prompt) :
+    BuiltInCommand(cmd_line),new_prompt(prompt){}
+    ~ChangePromptCommand() override = default;
     void execute() override;
 };
 
@@ -215,7 +217,6 @@ public:
   ~SmallShell();
   void executeCommand(const char* cmd_line);
   void setPrompt(const char* prompt);
-  JobsList* getJobList();
   // TODO: add extra methods as needed
 };
 
