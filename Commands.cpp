@@ -156,6 +156,23 @@ void JobsList::printJobsList() {
     }
 }
 
+JobsList::JobEntry* JobsList::getLastJob(int* lastJobId){
+    JobEntry last = job_list.back();
+    *lastJobId = last.job_id;
+    return &last;
+}
+
+JobsList::JobEntry* JobsList::getLastStoppedJob(int *jobId) {
+    list<JobEntry>::iterator i;
+    for (i = job_list.end(); i != job_list.begin(); --i){
+        if ((*i).status == Stopped){
+            *jobId = (*i).job_id;
+            return &(*i);
+        }
+    }
+    return nullptr;
+}
+
 SmallShell::SmallShell() {
 // TODO: add your implementation
 }
