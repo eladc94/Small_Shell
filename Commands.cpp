@@ -127,6 +127,28 @@ void JobsList::addJob(Command *cmd, bool isStopped) {
         foreground=nullptr;
     }
 }
+
+int JobsList::getMaxJobId() const {
+    list<JobEntry>::const_iterator i;
+    int max = -1;
+    if (this->job_list.empty())
+        return 1;
+    for (i = job_list.begin(); i != job_list.end(); ++i){
+        if ((*i).job_id > max)
+            max = (*i).job_id;
+    }
+    return max;
+}
+
+void JobsList::printJobsList() {
+    list<JobEntry>::const_iterator i;
+    list<JobEntry> temp = job_list;
+    temp.sort();
+    for (i = temp.begin(); i != temp.end(); ++i){
+        std::cout<<(*i)<<"\n";
+    }
+}
+
 SmallShell::SmallShell() {
 // TODO: add your implementation
 }
