@@ -103,7 +103,7 @@ protected:
  // TODO: Add your data members
 public:
     CommandsHistory();
-    ~CommandsHistory() override =default;
+    ~CommandsHistory()  =default;
     void addRecord(const char* cmd_line);
     void printHistory();
 };
@@ -186,7 +186,7 @@ public:
 class CopyCommand : public BuiltInCommand {
 public:
     CopyCommand(const char* cmd_line);
-    ~CopyCommand()= default;
+    ~CopyCommand() override = default;
     void execute() override;
 };
 
