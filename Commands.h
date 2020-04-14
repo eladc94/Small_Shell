@@ -29,7 +29,7 @@ public:
     //virtual void prepare();
     //virtual void cleanup();
     const char* getCommandLine() const {return cmd_line;}
-    int getPid() const {return pid};
+    int getPid() const {return pid;}
     // TODO: Add your extra methods if needed
 };
 
