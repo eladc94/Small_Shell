@@ -115,6 +115,18 @@ ostream& operator<<(ostream& os, const JobsList::JobEntry& job){
     return os;
 }
 
+int JobsList::getMaxJobId() const {
+    list<JobEntry>::const_iterator i;
+    int max = -1;
+    if (this->job_list.empty())
+        return 1;
+    for (i = job_list.begin(); i != job_list.end(); ++i){
+        if ((*i).job_id > max)
+            max = (*i).job_id;
+    }
+    return max;
+}
+
 void JobsList::addJob(Command *cmd, bool isStopped) {
     if(!isStopped) {
         int new_job_id = this->getMaxJobId() + 1;
@@ -126,18 +138,6 @@ void JobsList::addJob(Command *cmd, bool isStopped) {
         job_list.push_back(*foreground);
         foreground=nullptr;
     }
-}
-
-int JobsList::getMaxJobId() const {
-    list<JobEntry>::const_iterator i;
-    int max = -1;
-    if (this->job_list.empty())
-        return 1;
-    for (i = job_list.begin(); i != job_list.end(); ++i){
-        if ((*i).job_id > max)
-            max = (*i).job_id;
-    }
-    return max;
 }
 
 void JobsList::printJobsList() {
