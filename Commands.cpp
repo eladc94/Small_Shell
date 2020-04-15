@@ -107,6 +107,22 @@ void _removeBackgroundSign(char* cmd_line) {
     }
 }*/
 
+void ChangePromptCommand::execute() {
+    char* args[MAX_ARGUMENTS];
+    char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
+    strcpy(cmd_no_ampersand,cmd_line);
+    _removeBackgroundSign(cmd_no_ampersand);
+    int numOfArgs = _parseCommandLine(cmd_no_ampersand, args);
+    if (numOfArgs == 1)
+        (*new_prompt)="smash> ";
+    else {
+        (*new_prompt) = args[1];
+        (*new_prompt)+="> ";
+    }
+    for(int i=0;i<numOfArgs;i++)
+        free(args[i]);
+}
+
 void ShowPidCommand::execute() {
     std::cout << "smash pid is: " << getpid() << std::endl;
 }
@@ -120,7 +136,7 @@ void GetCurrDirCommand::execute() {
     std::cout << path << std::endl;
     free(path);
 }
-
+//free from parse!!!
 void ChangeDirCommand::execute() {
     char* args[MAX_ARGUMENTS];
     char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
@@ -159,23 +175,15 @@ void ChangeDirCommand::execute() {
     free(curr);
 }
 
+void JobsCommand::execute() {
+
+}
+
 void ExternalCommand::execute() {
-     char* args[4]={(char*)"/bin/bash",(char*)"-c",(char*)cmd_line,NULL};
+    char* args[4]={(char*)"/bin/bash",(char*)"-c",(char*)cmd_line,NULL};
     execv(args[0],args);
 }
-void ChangePromptCommand::execute() {
-    char* args[MAX_ARGUMENTS];
-    char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
-    strcpy(cmd_no_ampersand,cmd_line);
-    _removeBackgroundSign(cmd_no_ampersand);
-    int numOfArgs = _parseCommandLine(cmd_no_ampersand, args);
-    if (numOfArgs == 0)
-        (*new_prompt)="smash> ";
-    else {
-        (*new_prompt) = args[1];
-        (*new_prompt)+="> ";
-    }
-}
+
 bool operator==(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2){
     return je1.job_id==je2.job_id;
 }
@@ -223,7 +231,10 @@ void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
 }
 
 void JobsList::removeFinishedJobs() {
-    while(waitpid(-1,NULL,WNOHANG)!=0);
+    pid_t pid=waitpid(-1,NULL,WNOHANG)!=0;
+    while(pid!=0){
+
+    }
 }
 
 void JobsList::removeJobById(int jobId) {
@@ -271,24 +282,26 @@ SmallShell::~SmallShell() {
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
+//free parse!!
 Command * SmallShell::CreateCommand(const char* cmd_line) {//check if & was supplied
     char* args[MAX_ARGUMENTS];
     int num_of_args = _parseCommandLine(cmd_line, args);
     string command(args[0]);
+    Command* temp;
     if ("chprompt" == command){
-        return new ChangePromptCommand(cmd_line, &prompt);
+        temp= new ChangePromptCommand(cmd_line, &prompt);
     }
     else if ("showpid" == command){
-        return new ShowPidCommand(cmd_line);
+        temp= new ShowPidCommand(cmd_line);
     }
     else if ("pwd" == command){
-        return new GetCurrDirCommand(cmd_line);
+        temp= new GetCurrDirCommand(cmd_line);
     }
     else if("cd" == command){
-        return new ChangeDirCommand(cmd_line, &previous_path);
+        temp= new ChangeDirCommand(cmd_line, &previous_path);
     }
     else if("jobs" == command){
-        //return new JobsCommand
+        temp= new JobsCommand(cmd_line,&jobs);
     }
     else if("kill" == command){
         //return new KillCommand
@@ -302,9 +315,11 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {//check if & was supp
     else if("quit" == command){
         //return new q
     }else{
-        return new ExternalCommand(cmd_line);
+        temp = new ExternalCommand(cmd_line);
     }
-  return nullptr;
+    for(int i=0;i<num_of_args;i++)
+        free(args[i]);
+    return temp;
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
@@ -315,8 +330,6 @@ void SmallShell::executeCommand(const char *cmd_line) {
       delete cmd;
   }
   else if (dynamic_cast<ExternalCommand*>(cmd) != nullptr){
-      char* args[MAX_ARGUMENTS];
-      _parseCommandLine(cmd_line, args);
       if(_isBackgroundCommand(cmd_line)){
           pid_t pid = fork();
           if (pid == 0)

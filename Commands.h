@@ -152,9 +152,9 @@ public:
 };
 
 class JobsCommand : public BuiltInCommand {
- // TODO: Add your data members
+ JobsList* jobs;
 public:
-    JobsCommand(const char* cmd_line, JobsList* jobs);
+    JobsCommand(const char* cmd_line, JobsList* jobs) :BuiltInCommand(cmd_line),jobs(jobs) {}
     ~JobsCommand() override = default;
     void execute() override;
 };
