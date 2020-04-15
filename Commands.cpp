@@ -108,9 +108,9 @@ void _removeBackgroundSign(char* cmd_line) {
 }*/
 
 void ShowPidCommand::execute() {
-    std::cout << "smash pid is: " << getPid() << std::endl;
+    std::cout << "smash pid is: " << getpid() << std::endl;
 }
-
+//change syscall
 void GetCurrDirCommand::execute() {
     char* path = getcwd(NULL,0); //change to current_dir....
     if (NULL == path){
@@ -123,12 +123,16 @@ void GetCurrDirCommand::execute() {
 
 void ChangeDirCommand::execute() {
     char* args[MAX_ARGUMENTS];
-    int numOfArgs = _parseCommandLine(this->cmd_line, args);
+    char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
+    strcpy(cmd_no_ampersand,cmd_line);
+    _removeBackgroundSign(cmd_no_ampersand);
+    int numOfArgs = _parseCommandLine(cmd_no_ampersand, args);
     if (numOfArgs > CHDIR_MAX_ARG){
         perror("smash error: cd: too many arguments");
         return;
     }
-    //maybe 0 arguments error - do nothing
+    if(numOfArgs==1)
+        return;
     char* curr = getcwd(NULL, 0);
     if(NULL == curr){
         perror("smash error: getcwd failed");
@@ -155,7 +159,10 @@ void ChangeDirCommand::execute() {
 
 void ChangePromptCommand::execute() {
     char* args[MAX_ARGUMENTS];
-    int numOfArgs = _parseCommandLine(this->cmd_line, args);
+    char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
+    strcpy(cmd_no_ampersand,cmd_line);
+    _removeBackgroundSign(cmd_no_ampersand);
+    int numOfArgs = _parseCommandLine(cmd_no_ampersand, args);
     if (numOfArgs == 0)
         (*new_prompt)="smash>";
     else {
@@ -263,44 +270,33 @@ void SmallShell::setPrompt(const char *prompt) {
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {//check if & was supplied
     char* args[MAX_ARGUMENTS];
-    char cmd[COMMAND_ARGS_MAX_LENGTH];
-    strcpy(cmd, cmd_line);
     string command(args[0]);
     int num_of_args = _parseCommandLine(cmd_line, args);
     if ("chprompt" == command){
-        _removeBackgroundSign(cmd);
-        return new ChangePromptCommand(cmd, &prompt);
+        return new ChangePromptCommand(cmd_line, &prompt);
     }
     else if ("showpid" == command){
-        _removeBackgroundSign(cmd);
-        return new ShowPidCommand(cmd);
+        return new ShowPidCommand(cmd_line);
     }
     else if ("pwd" == command){
-        _removeBackgroundSign(cmd);
-        return new GetCurrDirCommand(cmd);
+        return new GetCurrDirCommand(cmd_line);
     }
     else if("cd" == command){
-        _removeBackgroundSign(cmd);
-        return new ChangeDirCommand(cmd, &previous_path);
+        return new ChangeDirCommand(cmd_line, &previous_path);
     }
     else if("jobs" == command){
-        _removeBackgroundSign(cmd);
         //return new JobsCommand
     }
     else if("kill" == command){
-        _removeBackgroundSign(cmd);
         //return new KillCommand
     }
     else if("fg" == command){
-        _removeBackgroundSign(cmd);
         //return new FG
     }
     else if("bg" == command){
-        _removeBackgroundSign(cmd);
         //return new BG
     }
     else if("quit" == command){
-        _removeBackgroundSign(cmd);
         //return new q
     }
     else{
