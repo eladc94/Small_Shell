@@ -176,10 +176,12 @@ void ChangeDirCommand::execute() {
 }
 
 void JobsCommand::execute() {
-
+    jobs->removeFinishedJobs();
+    jobs->printJobsList();
 }
 
 void ExternalCommand::execute() {
+    _removeBackgroundSign((char*)cmd_line);
     char* args[4]={(char*)"/bin/bash",(char*)"-c",(char*)cmd_line,NULL};
     execv(args[0],args);
 }
@@ -199,7 +201,7 @@ bool operator<(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2){
 ostream& operator<<(ostream& os, const JobsList::JobEntry& job){
     os<<job.cmd->getCommandLine()<<" : "<<job.pid<<" ";
     time_t curr_time=time(NULL);
-    int elapsed=(int)(difftime(job.start_time,curr_time));
+    int elapsed=(int)(difftime(curr_time,job.start_time));
     os<<elapsed<<" secs";
     if(job.status==Stopped)
         os<<" (stopped)";
@@ -231,9 +233,15 @@ void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
 }
 
 void JobsList::removeFinishedJobs() {
-    pid_t pid=waitpid(-1,NULL,WNOHANG)!=0;
-    while(pid!=0){
-
+    pid_t pid;
+    list<JobEntry>::iterator i;
+    list<JobEntry>::iterator temp;
+    for (i = job_list.begin(); i != job_list.end(); ++i){
+        pid = (*i).pid;
+        if (waitpid(pid,NULL,WNOHANG) == pid) {
+            job_list.erase(i);
+            i = job_list.begin();
+        }
     }
 }
 
@@ -287,21 +295,23 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {//check if & was supp
     char* args[MAX_ARGUMENTS];
     int num_of_args = _parseCommandLine(cmd_line, args);
     string command(args[0]);
+    char* cmd = new char[COMMAND_ARGS_MAX_LENGTH];
+    strcpy(cmd, cmd_line);
     Command* temp;
     if ("chprompt" == command){
-        temp= new ChangePromptCommand(cmd_line, &prompt);
+        temp= new ChangePromptCommand(cmd, &prompt);
     }
     else if ("showpid" == command){
-        temp= new ShowPidCommand(cmd_line);
+        temp= new ShowPidCommand(cmd);
     }
     else if ("pwd" == command){
-        temp= new GetCurrDirCommand(cmd_line);
+        temp= new GetCurrDirCommand(cmd);
     }
     else if("cd" == command){
-        temp= new ChangeDirCommand(cmd_line, &previous_path);
+        temp= new ChangeDirCommand(cmd, &previous_path);
     }
     else if("jobs" == command){
-        temp= new JobsCommand(cmd_line,&jobs);
+        temp= new JobsCommand(cmd,&jobs);
     }
     else if("kill" == command){
         //return new KillCommand
@@ -315,7 +325,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {//check if & was supp
     else if("quit" == command){
         //return new q
     }else{
-        temp = new ExternalCommand(cmd_line);
+        temp = new ExternalCommand(cmd);
     }
     for(int i=0;i<num_of_args;i++)
         free(args[i]);
@@ -332,8 +342,11 @@ void SmallShell::executeCommand(const char *cmd_line) {
   else if (dynamic_cast<ExternalCommand*>(cmd) != nullptr){
       if(_isBackgroundCommand(cmd_line)){
           pid_t pid = fork();
-          if (pid == 0)
+          if (pid == 0){
+              setpgrp();
               cmd->execute();
+          }
+
           else{
               jobs.addJob(cmd, pid);
           }
@@ -341,9 +354,10 @@ void SmallShell::executeCommand(const char *cmd_line) {
       else{
           pid_t pid = fork();
           int new_job_id=jobs.getMaxJobId()+1;
-
-          if (pid == 0)
+          if (pid == 0) {
+              setpgrp();
               cmd->execute();
+          }
           else {
               foreground=new JobsList::JobEntry(cmd,new_job_id,pid);
               waitpid(pid, NULL, 0);

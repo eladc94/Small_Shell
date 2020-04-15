@@ -25,7 +25,7 @@ protected:
     const char* cmd_line;
 public:
     explicit Command(const char* cmd_line) : cmd_line(cmd_line){}
-    virtual ~Command()= default;
+    virtual ~Command(){delete[] cmd_line;}
     virtual void execute() = 0;
     //virtual void prepare();
     //virtual void cleanup();
@@ -119,7 +119,7 @@ public:
 class JobsList {
 public:
     class JobEntry {
-        const shared_ptr<Command> cmd;
+        const Command* cmd;
         const int job_id;
         const pid_t pid;
         time_t start_time;
