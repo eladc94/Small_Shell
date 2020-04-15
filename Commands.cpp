@@ -233,15 +233,16 @@ void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
 }
 
 void JobsList::removeFinishedJobs() {
-    pid_t pid;
+    pid_t pid = waitpid((pid_t)-1,NULL,WNOHANG);
     list<JobEntry>::iterator i;
-    list<JobEntry>::iterator temp;
-    for (i = job_list.begin(); i != job_list.end(); ++i){
-        pid = (*i).pid;
-        if (waitpid(pid,NULL,WNOHANG) == pid) {
-            job_list.erase(i);
-            i = job_list.begin();
+    while(pid > 0){
+        for (i = job_list.begin(); i!=job_list.end(); ++i){
+            if ((*i).pid == pid) {
+                job_list.erase(i);
+                break;
+            }
         }
+        pid = waitpid(-1,NULL,WNOHANG);
     }
 }
 
