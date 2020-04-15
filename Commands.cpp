@@ -157,6 +157,11 @@ void ChangeDirCommand::execute() {
     free(curr);
 }
 
+void ExternalCommand::execute() {
+    char* args[MAX_ARGUMENTS];
+    _parseCommandLine(cmd_line,args);
+    execv("/bin/bash",args);
+}
 void ChangePromptCommand::execute() {
     char* args[MAX_ARGUMENTS];
     char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
@@ -167,7 +172,7 @@ void ChangePromptCommand::execute() {
         (*new_prompt)="smash>";
     else {
         (*new_prompt) = args[1];
-        (*new_prompt)+=">";
+        (*new_prompt)+="> ";
     }
 }
 bool operator==(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2){
@@ -210,12 +215,6 @@ void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
         JobEntry new_job = JobEntry(cmd, new_job_id, pid);
         job_list.push_back(new_job);
     }
-    else{
-        foreground->start_time = time(NULL);
-        this->foreground->status=Stopped;
-        job_list.push_back(*foreground);
-        foreground=nullptr;
-    }
 }
 
 void JobsList::removeJobById(int jobId) {
@@ -253,25 +252,20 @@ JobsList::JobEntry* JobsList::getLastStoppedJob(int *jobId) {
     return nullptr;
 }
 
-SmallShell::SmallShell() {
-// TODO: add your implementation
-}
+SmallShell::SmallShell() :jobs(JobsList()),prompt("smash> "),
+        previous_path(nullptr),foreground(nullptr) {}
 
 SmallShell::~SmallShell() {
 // TODO: add your implementation
 }
 
-void SmallShell::setPrompt(const char *prompt) {
-    this->prompt = prompt;
-    this->prompt += ">";
-}
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {//check if & was supplied
     char* args[MAX_ARGUMENTS];
-    string command(args[0]);
     int num_of_args = _parseCommandLine(cmd_line, args);
+    string command(args[0]);
     if ("chprompt" == command){
         return new ChangePromptCommand(cmd_line, &prompt);
     }
@@ -298,8 +292,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {//check if & was supp
     }
     else if("quit" == command){
         //return new q
-    }
-    else{
+    }else{
         return new ExternalCommand(cmd_line);
     }
   return nullptr;

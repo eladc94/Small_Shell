@@ -22,7 +22,7 @@ class Command {
 protected:
     const char* cmd_line;
 public:
-    Command(const char* cmd_line);
+    explicit Command(const char* cmd_line) : cmd_line(cmd_line){}
     virtual ~Command()= default;
     virtual void execute() = 0;
     //virtual void prepare();
@@ -33,13 +33,13 @@ public:
 
 class BuiltInCommand : public Command {
 public:
-    BuiltInCommand(const char* cmd_line): Command(cmd_line){}
+    explicit BuiltInCommand(const char* cmd_line): Command(cmd_line){}
     ~BuiltInCommand() override =default;
 };
 
 class ExternalCommand : public Command {
 public:
-    ExternalCommand(const char* cmd_line): Command(cmd_line){}
+    explicit ExternalCommand(const char* cmd_line): Command(cmd_line){}
     ~ExternalCommand() override = default;
     void execute() override;
 };
@@ -63,7 +63,6 @@ public:
 };
 
 class ChangeDirCommand : public BuiltInCommand {
-    const char* cmd_line;
     char** plastPwd;
 public:
     ChangeDirCommand(const char* cmd_line, char** plastPwd): BuiltInCommand(cmd_line), plastPwd(plastPwd){}
@@ -73,14 +72,14 @@ public:
 
 class GetCurrDirCommand : public BuiltInCommand {
 public:
-    GetCurrDirCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
+    explicit GetCurrDirCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
     ~GetCurrDirCommand() override = default;
     void execute() override;
 };
 
 class ShowPidCommand : public BuiltInCommand {
 public:
-    ShowPidCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
+   explicit ShowPidCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
     ~ShowPidCommand() override = default;
     void execute() override;
 };
@@ -134,7 +133,6 @@ public:
     };
 private:
     list<JobEntry> job_list;
-    JobEntry* foreground;
 public:
     JobsList()= default;
     ~JobsList()= default;
@@ -218,7 +216,7 @@ public:
   }
   ~SmallShell();
   void executeCommand(const char* cmd_line);
-  void setPrompt(const char* prompt);
+  string getPrompt() const {return prompt;}
   // TODO: add extra methods as needed
 };
 
