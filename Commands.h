@@ -21,7 +21,6 @@ enum Status{
 class Command {
 protected:
     const char* cmd_line;
-    int pid;
 public:
     Command(const char* cmd_line);
     virtual ~Command()= default;
@@ -29,7 +28,6 @@ public:
     //virtual void prepare();
     //virtual void cleanup();
     const char* getCommandLine() const {return cmd_line;}
-    int getPid() const {return pid;}
     // TODO: Add your extra methods if needed
 };
 
@@ -41,7 +39,7 @@ public:
 
 class ExternalCommand : public Command {
 public:
-    ExternalCommand(const char* cmd_line);
+    ExternalCommand(const char* cmd_line): Command(cmd_line){}
     ~ExternalCommand() override = default;
     void execute() override;
 };
@@ -122,10 +120,11 @@ public:
     class JobEntry {
         const Command* cmd;
         const int job_id;
+        const pid_t pid;
         time_t start_time;
         Status status;
     public:
-        JobEntry(Command* cmd,int job_id) :cmd(cmd),job_id(job_id),start_time(time(NULL)),status(Running){}
+        JobEntry(Command* cmd,int job_id, pid_t pid) :cmd(cmd),job_id(job_id),pid(pid),start_time(time(NULL)),status(Running){}
 
         friend bool operator==(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2);
         friend bool operator!=(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2);
@@ -139,7 +138,7 @@ private:
 public:
     JobsList()= default;
     ~JobsList()= default;
-    void addJob(Command* cmd, bool isStopped = false);
+    void addJob(Command* cmd, pid_t pid, bool isStopped = false);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
@@ -207,6 +206,7 @@ private:
     JobsList jobs;
     string prompt;
     char* previous_path;
+    JobsList::JobEntry* foreground;
     SmallShell();
 public:
     Command *CreateCommand(const char* cmd_line);

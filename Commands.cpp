@@ -112,7 +112,7 @@ void ShowPidCommand::execute() {
 }
 
 void GetCurrDirCommand::execute() {
-    char* path = getcwd(NULL,0);
+    char* path = getcwd(NULL,0); //change to current_dir....
     if (NULL == path){
         perror("smash error: getcwd failed");
         return;
@@ -128,7 +128,7 @@ void ChangeDirCommand::execute() {
         perror("smash error: cd: too many arguments");
         return;
     }
-    //maybe 0 arguments error
+    //maybe 0 arguments error - do nothing
     char* curr = getcwd(NULL, 0);
     if(NULL == curr){
         perror("smash error: getcwd failed");
@@ -175,9 +175,8 @@ bool operator<(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2){
     return je1.job_id<je2.job_id;
 }
 
-//might need to change this, if we remove pid from Command class
 ostream& operator<<(ostream& os, const JobsList::JobEntry& job){
-    os<<job.cmd->getCommandLine()<<" : "<<job.cmd->getPid()<<" ";
+    os<<job.cmd->getCommandLine()<<" : "<<job.pid<<" ";
     time_t curr_time=time(NULL);
     int elapsed=(int)(difftime(job.start_time,curr_time));
     os<<elapsed<<" secs";
@@ -190,7 +189,7 @@ int JobsList::getMaxJobId() const {
     list<JobEntry>::const_iterator i;
     int max = -1;
     if (this->job_list.empty())
-        return 1; //why 1?
+        return 0;
     for (i = job_list.begin(); i != job_list.end(); ++i){
         if ((*i).job_id > max)
             max = (*i).job_id;
@@ -198,10 +197,10 @@ int JobsList::getMaxJobId() const {
     return max;
 }
 
-void JobsList::addJob(Command *cmd, bool isStopped) {
+void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
     if(!isStopped) {
         int new_job_id = this->getMaxJobId() + 1;
-        JobEntry new_job = JobEntry(cmd, new_job_id);
+        JobEntry new_job = JobEntry(cmd, new_job_id, pid);
         job_list.push_back(new_job);
     }
     else{
@@ -229,17 +228,16 @@ void JobsList::printJobsList() {
         std::cout<<(*i)<<endl;
     }
 }
-//problem here!!
+
 JobsList::JobEntry* JobsList::getLastJob(int* lastJobId){
-    JobEntry last = job_list.back();
-    *lastJobId = last.job_id;
-    return &last;
+    JobEntry* last = &(job_list.back());
+    *lastJobId = last->job_id;
+    return last;
 }
 
-//i think there is a problem here , think we need reverse_iterator
 JobsList::JobEntry* JobsList::getLastStoppedJob(int *jobId) {
-    list<JobEntry>::iterator i;
-    for (i = job_list.end(); i != job_list.begin(); --i){
+    list<JobEntry>::reverse_iterator i;
+    for (i = job_list.rbegin(); i != job_list.rend(); ++i){
         if ((*i).status == Stopped){
             *jobId = (*i).job_id;
             return &(*i);
@@ -263,26 +261,81 @@ void SmallShell::setPrompt(const char *prompt) {
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
-Command * SmallShell::CreateCommand(const char* cmd_line) {
-	// For example:
-/*
-  string cmd_s = string(cmd_line);
-  if (cmd_s.find("pwd") == 0) {
-    return new GetCurrDirCommand(cmd_line);
-  }
-  else if ...
-  .....
-  else {
-    return new ExternalCommand(cmd_line);
-  }
-  */
+Command * SmallShell::CreateCommand(const char* cmd_line) {//check if & was supplied
+    char* args[MAX_ARGUMENTS];
+    char cmd[COMMAND_ARGS_MAX_LENGTH];
+    strcpy(cmd, cmd_line);
+    string command(args[0]);
+    int num_of_args = _parseCommandLine(cmd_line, args);
+    if ("chprompt" == command){
+        _removeBackgroundSign(cmd);
+        return new ChangePromptCommand(cmd, &prompt);
+    }
+    else if ("showpid" == command){
+        _removeBackgroundSign(cmd);
+        return new ShowPidCommand(cmd);
+    }
+    else if ("pwd" == command){
+        _removeBackgroundSign(cmd);
+        return new GetCurrDirCommand(cmd);
+    }
+    else if("cd" == command){
+        _removeBackgroundSign(cmd);
+        return new ChangeDirCommand(cmd, &previous_path);
+    }
+    else if("jobs" == command){
+        _removeBackgroundSign(cmd);
+        //return new JobsCommand
+    }
+    else if("kill" == command){
+        _removeBackgroundSign(cmd);
+        //return new KillCommand
+    }
+    else if("fg" == command){
+        _removeBackgroundSign(cmd);
+        //return new FG
+    }
+    else if("bg" == command){
+        _removeBackgroundSign(cmd);
+        //return new BG
+    }
+    else if("quit" == command){
+        _removeBackgroundSign(cmd);
+        //return new q
+    }
+    else{
+        return new ExternalCommand(cmd_line);
+    }
   return nullptr;
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
   // TODO: Add your implementation here
-  // for example:
-  // Command* cmd = CreateCommand(cmd_line);
-  // cmd->execute();
+  Command* cmd = CreateCommand(cmd_line);
+  if (dynamic_cast<BuiltInCommand*>(cmd) != nullptr){
+      cmd->execute();
+      delete cmd;
+  }
+  else if (dynamic_cast<ExternalCommand*>(cmd) != nullptr){
+      char* args[MAX_ARGUMENTS];
+      _parseCommandLine(cmd_line, args);
+      if(_isBackgroundCommand(cmd_line)){
+          pid_t pid = fork();
+          if (pid == 0)
+              cmd->execute();
+          else{
+              jobs.addJob(cmd, pid);
+          }
+      }
+      else{
+          pid_t pid = fork();
+          if (pid == 0)
+              cmd->execute();
+          else {
+              waitpid(pid, NULL, 0);
+              delete cmd;
+          }
+      }
+  }
   // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
