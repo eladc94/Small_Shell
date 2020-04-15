@@ -153,14 +153,15 @@ void ChangeDirCommand::execute() {
         perror("smash error: chdir failed");
         return;
     }
+    delete[] (*plastPwd);
+    *plastPwd=new char[COMMAND_ARGS_MAX_LENGTH];
     strcpy(*plastPwd, curr);
     free(curr);
 }
 
 void ExternalCommand::execute() {
-    char* args[MAX_ARGUMENTS];
-    _parseCommandLine(cmd_line,args);
-    execv("/bin/bash",args);
+     char* args[4]={(char*)"/bin/bash",(char*)"-c",(char*)cmd_line,NULL};
+    execv(args[0],args);
 }
 void ChangePromptCommand::execute() {
     char* args[MAX_ARGUMENTS];
@@ -169,7 +170,7 @@ void ChangePromptCommand::execute() {
     _removeBackgroundSign(cmd_no_ampersand);
     int numOfArgs = _parseCommandLine(cmd_no_ampersand, args);
     if (numOfArgs == 0)
-        (*new_prompt)="smash>";
+        (*new_prompt)="smash> ";
     else {
         (*new_prompt) = args[1];
         (*new_prompt)+="> ";
@@ -215,6 +216,14 @@ void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
         JobEntry new_job = JobEntry(cmd, new_job_id, pid);
         job_list.push_back(new_job);
     }
+    //stopping
+    /*else{
+
+    }*/
+}
+
+void JobsList::removeFinishedJobs() {
+    while(waitpid(-1,NULL,WNOHANG)!=0);
 }
 
 void JobsList::removeJobById(int jobId) {
@@ -318,11 +327,15 @@ void SmallShell::executeCommand(const char *cmd_line) {
       }
       else{
           pid_t pid = fork();
+          int new_job_id=jobs.getMaxJobId()+1;
+
           if (pid == 0)
               cmd->execute();
           else {
+              foreground=new JobsList::JobEntry(cmd,new_job_id,pid);
               waitpid(pid, NULL, 0);
-              delete cmd;
+              delete foreground;
+              foreground= nullptr;
           }
       }
   }

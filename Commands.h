@@ -2,10 +2,12 @@
 #define SMASH_COMMAND_H_
 
 #include <vector>
+#include <memory>
 #include <iostream>
 #include <list>
 #include <time.h>
 using std::string;
+using std::shared_ptr;
 using std::list;
 using std::ostream;
 #define COMMAND_ARGS_MAX_LENGTH (200)
@@ -117,13 +119,15 @@ public:
 class JobsList {
 public:
     class JobEntry {
-        const Command* cmd;
+        const shared_ptr<Command> cmd;
         const int job_id;
         const pid_t pid;
         time_t start_time;
         Status status;
     public:
-        JobEntry(Command* cmd,int job_id, pid_t pid) :cmd(cmd),job_id(job_id),pid(pid),start_time(time(NULL)),status(Running){}
+        JobEntry(Command* cmd,int job_id, pid_t pid) :cmd(cmd),job_id(job_id),pid(pid)
+        ,start_time(time(NULL)),status(Running){}
+        JobEntry(const JobEntry& je)= default;
 
         friend bool operator==(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2);
         friend bool operator!=(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2);
@@ -134,7 +138,7 @@ public:
 private:
     list<JobEntry> job_list;
 public:
-    JobsList()= default;
+    JobsList() : job_list(list<JobEntry>()){}
     ~JobsList()= default;
     void addJob(Command* cmd, pid_t pid, bool isStopped = false);
     void printJobsList();
