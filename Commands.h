@@ -137,18 +137,22 @@ public:
     };
 private:
     list<JobEntry> job_list;
+    pid_t foreground;
 public:
-    JobsList() : job_list(list<JobEntry>()){}
+    JobsList() : job_list(list<JobEntry>()), foreground(-1){}
     ~JobsList()= default;
     void addJob(Command* cmd, pid_t pid, bool isStopped = false);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
     JobEntry * getJobById(int jobId);
+    pid_t getMaxPid();
     void removeJobById(int jobId);
     JobEntry * getLastJob(int* lastJobId);
     JobEntry *getLastStoppedJob(int *jobId);
     int getMaxJobId() const;
+    void setForeground(int fg);
+    int getPidByJobID(int job_id);
 };
 
 class JobsCommand : public BuiltInCommand {
@@ -160,17 +164,17 @@ public:
 };
 
 class KillCommand : public BuiltInCommand {
- // TODO: Add your data members
+ JobsList* jobs;
 public:
-    KillCommand(const char* cmd_line, JobsList* jobs);
+    KillCommand(const char* cmd_line, JobsList* jobs): BuiltInCommand(cmd_line), jobs(jobs){}
     ~KillCommand() override = default;
     void execute() override;
 };
 
 class ForegroundCommand : public BuiltInCommand {
- // TODO: Add your data members
+ JobsList* jobs;
 public:
-    ForegroundCommand(const char* cmd_line, JobsList* jobs);
+    ForegroundCommand(const char* cmd_line, JobsList* jobs): BuiltInCommand(cmd_line), jobs(jobs){}
     ~ForegroundCommand() override = default;
     void execute() override;
 };
@@ -208,7 +212,6 @@ private:
     JobsList jobs;
     string prompt;
     char* previous_path;
-    JobsList::JobEntry* foreground;
     SmallShell();
 public:
     Command *CreateCommand(const char* cmd_line);

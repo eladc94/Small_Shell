@@ -174,8 +174,7 @@ void ChangeDirCommand::execute() {
         dst = *plastPwd;
     } else
         dst=args[1];
-    int flag = chdir(dst);
-    if (flag != 0) {
+    if (chdir(dst) != 0) {
         perror("smash error: chdir failed");
         free(curr);
         free(args[0]);
@@ -193,10 +192,92 @@ void JobsCommand::execute() {
     jobs->printJobsList();
 }
 
+void KillCommand::execute() {
+    char* args[MAX_ARGUMENTS];
+    char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
+    strcpy(cmd_no_ampersand,cmd_line);
+    _removeBackgroundSign(cmd_no_ampersand);
+    int numOfArgs = _parseCommandLine(cmd_no_ampersand, args);
+    //if (args[1][0] != '-')
+    if (numOfArgs != 3){
+        perror("smash error: kill: invalid arguments");
+        for (int i = 0; i < numOfArgs; ++i)
+            free(args[i]);
+    }
+    int sig = stoi(args[1], nullptr);
+    int pid = stoi(args[2], nullptr);
+    sig = sig*(-1);
+    if (kill(pid, sig) == -1)
+        perror("smash error: kill failed");
+    else
+        std::cout << "signal number " << sig << " was sent to pid " << pid << std::endl;
+    for (int i = 0; i < numOfArgs; ++i)
+        free(args[i]);
+}
+
+void ForegroundCommand::execute() {
+    char* args[MAX_ARGUMENTS];
+    char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
+    strcpy(cmd_no_ampersand,cmd_line);
+    _removeBackgroundSign(cmd_no_ampersand);
+    int numOfArgs = _parseCommandLine(cmd_no_ampersand, args);
+    pid_t pid = -1;
+    int job_id = -1;
+    bool flag = false;
+    if (numOfArgs > 2){
+        perror("smash error: fg: invalid arguments");
+        flag = true;
+    }
+    else if (numOfArgs == 2) {
+        try {
+            job_id = stoi(args[1], nullptr);
+        }
+        catch (const std::invalid_argument& ia){
+            perror("smash error: fg: invalid arguments");
+            for (int i = 0; i < numOfArgs; ++i) {
+                free(args[i]);
+            }
+            return;
+        }
+        pid = jobs->getPidByJobID(job_id);
+        if (pid == -1){
+            string error = "smash error: fg: job-id " + to_string(job_id) + " does not exists";
+            perror(error.c_str());
+            flag = true;
+        }
+    }
+    else {
+        job_id = jobs->getMaxJobId();
+        pid = jobs->getPidByJobID(job_id);
+        if (pid == -1) {
+            perror("smash error: fg: jobs list is empty");
+            flag = true;
+        }
+    }
+    if (flag){
+        for (int i = 0; i < numOfArgs; ++i) {
+            free(args[i]);
+        }
+        return;
+    }
+    if (kill(pid, SIGCONT) == -1)
+            perror("smash error: kill failed");
+    else{
+            jobs->setForeground(pid);
+            waitpid(pid, NULL, 0);
+            jobs->removeJobById(job_id);
+    }
+}
+
 void ExternalCommand::execute() {
     _removeBackgroundSign((char*)cmd_line);
     char* args[4]={(char*)"/bin/bash",(char*)"-c",(char*)cmd_line,NULL};
-    execv(args[0],args);
+    int flag = execv(args[0],args);
+    if (flag == -1){
+        perror("smash error: execv failed");
+        exit(0);
+    }
+
 }
 
 bool operator==(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2){
@@ -212,6 +293,7 @@ bool operator<(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2){
 }
 
 ostream& operator<<(ostream& os, const JobsList::JobEntry& job){
+    os << "[" << job.job_id << "] ";
     os<<job.cmd->getCommandLine()<<" : "<<job.pid<<" ";
     time_t curr_time=time(NULL);
     int elapsed=(int)(difftime(curr_time,job.start_time));
@@ -246,7 +328,13 @@ void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
 }
 
 void JobsList::removeFinishedJobs() {
+    if (job_list.empty())
+        return;
     pid_t pid = waitpid((pid_t)-1,NULL,WNOHANG);
+    if (pid < 0) {
+        perror("smash error: waitpid failed");
+        return;
+    }
     list<JobEntry>::iterator i;
     while(pid > 0){
         for (i = job_list.begin(); i!=job_list.end(); ++i){
@@ -255,7 +343,13 @@ void JobsList::removeFinishedJobs() {
                 break;
             }
         }
+        if (job_list.empty())
+            return;
         pid = waitpid(-1,NULL,WNOHANG);
+        if (pid < 0) {
+            perror("smash error: waitpid failed");
+            return;
+        }
     }
 }
 
@@ -294,8 +388,34 @@ JobsList::JobEntry* JobsList::getLastStoppedJob(int *jobId) {
     return nullptr;
 }
 
+void JobsList::setForeground(int fg) {
+    foreground = fg;
+}
+
+pid_t JobsList::getMaxPid() {
+    if (job_list.empty())
+        return 0;
+    int maxID = getMaxJobId();
+    return getJobById(maxID)->pid;
+}
+
+int JobsList::getPidByJobID(int job_id) {
+    if (nullptr == getJobById(job_id))
+        return -1;
+    return getJobById(job_id)->pid;
+}
+
+JobsList::JobEntry *JobsList::getJobById(int jobId) {
+    list<JobEntry>::iterator i;
+    for(i = job_list.begin(); i != job_list.end(); ++i){
+        if (i->job_id == jobId)
+            return &(*i);
+    }
+    return nullptr;
+}
+
 SmallShell::SmallShell() :jobs(JobsList()),prompt("smash> "),
-        previous_path(nullptr),foreground(nullptr) {}
+        previous_path(nullptr) {}
 
 SmallShell::~SmallShell() {
 // TODO: add your implementation
@@ -328,10 +448,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {//check if & was supp
         temp= new JobsCommand(cmd,&jobs);
     }
     else if("kill" == command){
-        //return new KillCommand
+        return new KillCommand(cmd, &jobs);
     }
     else if("fg" == command){
-        //return new FG
+        return new ForegroundCommand(cmd, &jobs);
     }
     else if("bg" == command){
         //return new BG
@@ -373,10 +493,9 @@ void SmallShell::executeCommand(const char *cmd_line) {
               cmd->execute();
           }
           else {
-              foreground=new JobsList::JobEntry(cmd,new_job_id,pid);
+              jobs.setForeground(pid);
               waitpid(pid, NULL, 0);
-              delete foreground;
-              foreground= nullptr;
+              jobs.setForeground(-1);
           }
       }
   }
