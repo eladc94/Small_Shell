@@ -88,9 +88,9 @@ public:
 
 class JobsList;
 class QuitCommand : public BuiltInCommand {
-// TODO: Add your data members
+    JobsList* jobs;
 public:
-    QuitCommand(const char* cmd_line, JobsList* jobs);
+    QuitCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line),jobs(jobs){}
     ~QuitCommand() override = default;
     void execute() override;
 };
@@ -128,11 +128,16 @@ public:
         JobEntry(Command* cmd,int job_id, pid_t pid) :cmd(cmd),job_id(job_id),pid(pid)
         ,start_time(time(NULL)),status(Running){}
         JobEntry(const JobEntry& je)= default;
+        Status getStatus() const {return status;}
+        void setTime(time_t time){start_time=time;}
+        void setStatus(Status st){status=st;}
+
 
         friend bool operator==(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2);
         friend bool operator!=(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2);
         friend bool operator<(const JobEntry& je1,const JobEntry& je2);
         friend ostream& operator<<(ostream& os,const JobEntry& je);
+
         friend class JobsList;
     };
 private:
@@ -142,17 +147,19 @@ public:
     JobsList() : job_list(list<JobEntry>()), foreground(-1){}
     ~JobsList()= default;
     void addJob(Command* cmd, pid_t pid, bool isStopped = false);
-    void printJobsList();
-    void killAllJobs();
     void removeFinishedJobs();
+    pid_t getPidByJobID(int job_id);
     JobEntry * getJobById(int jobId);
-    pid_t getMaxPid();
-    void removeJobById(int jobId);
-    JobEntry * getLastJob(int* lastJobId);
     JobEntry *getLastStoppedJob(int *jobId);
+    JobEntry * getLastJob(int* lastJobId);
+    void removeJobById(int jobId);
     int getMaxJobId() const;
     void setForeground(int fg);
-    int getPidByJobID(int job_id);
+    void printJobsList() const;
+    void printForQuit() const;
+    void killAllJobs();
+
+
 };
 
 class JobsCommand : public BuiltInCommand {
@@ -180,9 +187,9 @@ public:
 };
 
 class BackgroundCommand : public BuiltInCommand {
- // TODO: Add your data members
+ JobsList* jobs;
 public:
-    BackgroundCommand(const char* cmd_line, JobsList* jobs);
+    BackgroundCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line),jobs(jobs){}
     ~BackgroundCommand() override = default;
     void execute() override;
 };
