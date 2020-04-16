@@ -126,17 +126,17 @@ void ChangePromptCommand::execute() {
 void ShowPidCommand::execute() {
     std::cout << "smash pid is: " << getpid() << std::endl;
 }
-//change syscall
+
 void GetCurrDirCommand::execute() {
-    char* path = getcwd(NULL,0); //change to current_dir....
+    char* path = get_current_dir_name(); //change to current_dir....
     if (NULL == path){
-        perror("smash error: getcwd failed");
+        perror("smash error: get_current_dir_name failed");
         return;
     }
     std::cout << path << std::endl;
     free(path);
 }
-//free from parse!!!
+
 void ChangeDirCommand::execute() {
     char* args[MAX_ARGUMENTS];
     char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
@@ -145,19 +145,30 @@ void ChangeDirCommand::execute() {
     int numOfArgs = _parseCommandLine(cmd_no_ampersand, args);
     if (numOfArgs > CHDIR_MAX_ARG){
         perror("smash error: cd: too many arguments");
+        for(int i=0;i<numOfArgs;i++)
+            free(args[i]);
         return;
     }
-    if(numOfArgs==1)
+    if(numOfArgs<=1) {
+        for(int i=0;i<numOfArgs;i++)
+            free(args[i]);
         return;
-    char* curr = getcwd(NULL, 0);
+    }
+    //at this points,numofargs=2
+    char* curr = get_current_dir_name();
     if(NULL == curr){
-        perror("smash error: getcwd failed");
+        perror("smash error: get_current_dir_name failed");
+        free(args[0]);
+        free(args[1]);
+        return;
     }
     char * dst;
     if (strcmp(args[1],CHDIR_PREV) == 0) { // if "-" was sent
         if (NULL == *plastPwd) {
             perror("smash error: cd: OLDPWD not set");
             free(curr);
+            free(args[0]);
+            free(args[1]);
             return;
         }
         dst = *plastPwd;
@@ -165,8 +176,10 @@ void ChangeDirCommand::execute() {
         dst=args[1];
     int flag = chdir(dst);
     if (flag != 0) {
-        free(curr);
         perror("smash error: chdir failed");
+        free(curr);
+        free(args[0]);
+        free(args[1]);
         return;
     }
     delete[] (*plastPwd);
@@ -298,7 +311,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {//check if & was supp
     string command(args[0]);
     char* cmd = new char[COMMAND_ARGS_MAX_LENGTH];
     strcpy(cmd, cmd_line);
-    Command* temp;
+    Command* temp= nullptr;
     if ("chprompt" == command){
         temp= new ChangePromptCommand(cmd, &prompt);
     }
