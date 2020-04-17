@@ -149,18 +149,19 @@ public:
     ~JobsList()= default;
     void addJob(Command* cmd, pid_t pid, bool isStopped = false);
     void removeFinishedJobs();
-    pid_t getPidByJobID(int job_id);
     JobEntry * getJobById(int jobId);
+    JobEntry * getJobByPid(int pid);
+    pid_t getPidByJobID(int job_id);
     JobEntry *getLastStoppedJob(int *jobId);
     JobEntry * getLastJob(int* lastJobId);
     void removeJobById(int jobId);
+    void removeJobByPid(int pid);
     int getMaxJobId() const;
     void setForeground(int fg);
     void printJobsList() const;
     void printForQuit() const;
     void killAllJobs();
-
-
+    pid_t getForeground();
 };
 
 class JobsCommand : public BuiltInCommand {
@@ -232,6 +233,7 @@ public:
   ~SmallShell();
   void executeCommand(const char* cmd_line);
   string getPrompt() const {return prompt;}
+  JobsList* getJobList();
   // TODO: add extra methods as needed
 };
 

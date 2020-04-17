@@ -1,7 +1,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <iostream>
-#include <vector>
 #include <sstream>
 #include <sys/wait.h>
 #include <iomanip>
@@ -272,8 +271,9 @@ void ForegroundCommand::execute() {
             perror("smash error: kill failed");
     else{
             jobs->setForeground(pid);
-            waitpid(pid, NULL, 0);
-            jobs->removeJobById(job_id);
+            waitpid(pid, NULL, WUNTRACED);
+            if (Stopped != jobs->getJobByPid(pid)->getStatus())
+                jobs->removeJobById(job_id);
     }
     for(int i=0;i<numOfArgs;i++){
         free(args[i]);
@@ -359,13 +359,16 @@ void QuitCommand::execute() {
     strcpy(cmd_no_ampersand,cmd_line);
     char* args[MAX_ARGUMENTS];
     int numOfArgs=_parseCommandLine(cmd_no_ampersand,args);
-    if(numOfArgs>=2 && (strcmp(args[1],"kill") == 0)){
+    bool kill = false;
+    if (numOfArgs >= 2)
+        for (int i = 1; i<numOfArgs; ++i)
+            if (strcmp(args[i],"kill") == 0)
+                kill = true;
+    if(kill)
         jobs->printForQuit();
-    }
     jobs->killAllJobs();
     for(int i=0;i<numOfArgs;i++)
         free(args[i]);
-
 }
 
 bool operator==(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2){
@@ -439,6 +442,15 @@ void JobsList::removeJobById(int jobId) {
         }
 }
 
+void JobsList::removeJobByPid(int pid) {
+    list<JobEntry>::iterator i;
+    for(i = this->job_list.begin(); i != this->job_list.end(); ++i)
+        if(i->job_id == pid) {
+            job_list.erase(i);
+            return;
+        }
+}
+
 void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
     this->removeFinishedJobs();
     if(!isStopped) {
@@ -489,7 +501,7 @@ void JobsList::printJobsList() const{
 }
 
 void JobsList::printForQuit() const{
-    cout<<"smash:sending SIGKILL signal to "<<job_list.size()<< " jobs:"<<endl;
+    cout<<"smash: sending SIGKILL signal to "<<job_list.size()<< " jobs:"<<endl;
     list<JobEntry>::const_iterator i;
     for(i=job_list.begin();i!=job_list.end();++i){
         cout<<i->pid<<": "<<i->cmd->getCommandLine()<<endl;
@@ -517,6 +529,18 @@ int JobsList::getPidByJobID(int job_id) {
     return getJobById(job_id)->pid;
 }
 
+pid_t JobsList::getForeground() {
+    return foreground;
+}
+
+JobsList::JobEntry *JobsList::getJobByPid(int pid) {
+    list<JobEntry>::iterator i;
+    for(i = job_list.begin(); i != job_list.end(); ++i){
+        if (i->pid == pid)
+            return &(*i);
+    }
+    return nullptr;
+}
 
 
 SmallShell::SmallShell() :jobs(JobsList()),prompt("smash> "),
@@ -601,11 +625,15 @@ void SmallShell::executeCommand(const char *cmd_line) {
               } else {
                   jobs.setForeground(pid);
                 jobs.addJob(cmd,pid);
-                waitpid(pid, NULL, 0);
-                jobs.removeJobById(jobs.getMaxJobId());
+                waitpid(pid, NULL, WUNTRACED);
+                if (Stopped != jobs.getJobByPid(pid)->getStatus())
+                    jobs.removeJobById(jobs.getMaxJobId());
                 jobs.setForeground(-1);
               }
           }
     }
-  // Please note that you must fork smash process for some commands (e.g., external commands....)
+}
+
+JobsList *SmallShell::getJobList() {
+    return &jobs;
 }

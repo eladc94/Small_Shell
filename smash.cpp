@@ -17,6 +17,8 @@ int main(int argc, char* argv[]) {
 
     SmallShell& smash = SmallShell::getInstance();
     while(true) {
+        signal(SIGTSTP, ctrlZHandler);
+        signal(SIGINT, ctrlCHandler);
         std::cout << smash.getPrompt();
         std::string cmd_line;
         std::getline(std::cin, cmd_line);
