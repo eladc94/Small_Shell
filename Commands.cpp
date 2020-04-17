@@ -434,9 +434,7 @@ void JobsList::removeJobById(int jobId) {
     list<JobEntry>::iterator i;
     for(i=this->job_list.begin();i!=this->job_list.end();i++)
         if(i->job_id==jobId) {
-            Command* temp=i->getCommandPointer();
             job_list.erase(i);
-            delete temp;
             return;
         }
 }
@@ -466,9 +464,7 @@ void JobsList::removeFinishedJobs() {
     while(pid > 0){
         for (i = job_list.begin(); i!=job_list.end(); ++i){
             if ((*i).pid == pid) {
-                Command* temp=i->getCommandPointer();
                 job_list.erase(i);
-                delete temp;
                 break;
             }
         }
@@ -508,7 +504,6 @@ void JobsList::killAllJobs() {
         else{
             waitpid(i->pid,NULL,0);
         }
-        delete i->getCommandPointer();
     }
     job_list.clear();
 }
@@ -578,41 +573,39 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {//check if & was supp
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
-  Command* cmd = CreateCommand(cmd_line);
-  jobs.removeFinishedJobs();
-  if (dynamic_cast<BuiltInCommand*>(cmd) != nullptr){
-      cmd->execute();
-      if(dynamic_cast<QuitCommand*>(cmd)!= nullptr){
-          delete cmd;
-          exit(0);
-      }
-      delete cmd;
-  }
-  else if (dynamic_cast<ExternalCommand*>(cmd) != nullptr){
-      if(_isBackgroundCommand(cmd_line)){
-          pid_t pid = fork();
-          if (pid == 0){
-              setpgrp();
-              cmd->execute();
-          }
-          else{
+    if(strcmp(cmd_line,"")==0)
+        return;
+    Command* cmd = CreateCommand(cmd_line);
+    jobs.removeFinishedJobs();
+    if (dynamic_cast<BuiltInCommand*>(cmd) != nullptr){
+        cmd->execute();
+        if(dynamic_cast<QuitCommand*>(cmd)!= nullptr){
+            delete cmd;
+            exit(0);
+        }
+        delete cmd;
+    } else if (dynamic_cast<ExternalCommand*>(cmd) != nullptr){
+          if(_isBackgroundCommand(cmd_line)){
+              pid_t pid = fork();
+              if (pid == 0){
+                  setpgrp();
+                  cmd->execute();
+              } else{
               jobs.addJob(cmd, pid);
+              }
+          } else{
+              pid_t pid = fork();
+              if (pid == 0) {
+                  setpgrp();
+                  cmd->execute();
+              } else {
+                  jobs.setForeground(pid);
+                jobs.addJob(cmd,pid);
+                waitpid(pid, NULL, 0);
+                jobs.removeJobById(jobs.getMaxJobId());
+                jobs.setForeground(-1);
+              }
           }
-      }
-      else{
-          pid_t pid = fork();
-          if (pid == 0) {
-              setpgrp();
-              cmd->execute();
-          }
-          else {
-              jobs.setForeground(pid);
-              jobs.addJob(cmd,pid);
-              waitpid(pid, NULL, 0);
-              jobs.removeJobById(jobs.getMaxJobId());
-              jobs.setForeground(-1);
-          }
-      }
-  }
+    }
   // Please note that you must fork smash process for some commands (e.g., external commands....)
 }

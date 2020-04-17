@@ -119,7 +119,7 @@ public:
 class JobsList {
 public:
     class JobEntry {
-        Command* cmd;
+        const shared_ptr<Command> cmd;
         const int job_id;
         const pid_t pid;
         time_t start_time;
@@ -130,7 +130,6 @@ public:
         JobEntry(const JobEntry& je)= default;
         ~JobEntry() = default;
         Status getStatus() const {return status;}
-        Command* getCommandPointer() const {return cmd;}
         void setTime(time_t time){start_time=time;}
         void setStatus(Status st){status=st;}
 
