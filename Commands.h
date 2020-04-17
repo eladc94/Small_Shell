@@ -119,7 +119,7 @@ public:
 class JobsList {
 public:
     class JobEntry {
-        const Command* cmd;
+        Command* cmd;
         const int job_id;
         const pid_t pid;
         time_t start_time;
@@ -128,7 +128,9 @@ public:
         JobEntry(Command* cmd,int job_id, pid_t pid) :cmd(cmd),job_id(job_id),pid(pid)
         ,start_time(time(NULL)),status(Running){}
         JobEntry(const JobEntry& je)= default;
+        ~JobEntry() = default;
         Status getStatus() const {return status;}
+        Command* getCommandPointer() const {return cmd;}
         void setTime(time_t time){start_time=time;}
         void setStatus(Status st){status=st;}
 

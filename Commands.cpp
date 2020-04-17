@@ -184,6 +184,8 @@ void ChangeDirCommand::execute() {
     delete[] (*plastPwd);
     *plastPwd=new char[COMMAND_ARGS_MAX_LENGTH];
     strcpy(*plastPwd, curr);
+    for(int i=0;i<numOfArgs;i++)
+        free(args[i]);
     free(curr);
 }
 
@@ -191,7 +193,7 @@ void JobsCommand::execute() {
     jobs->removeFinishedJobs();
     jobs->printJobsList();
 }
-
+//kill is supposed to get job id, not pid!!!
 void KillCommand::execute() {
     char* args[MAX_ARGUMENTS];
     char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
@@ -203,12 +205,18 @@ void KillCommand::execute() {
         perror("smash error: kill: invalid arguments");
         for (int i = 0; i < numOfArgs; ++i)
             free(args[i]);
+        return;
     }
+    //check format of ints
     int sig = stoi(args[1], nullptr);
     int pid = stoi(args[2], nullptr);
     sig = sig*(-1);
-    if (kill(pid, sig) == -1)
+    if (kill(pid, sig) == -1) {
         perror("smash error: kill failed");
+        for(int i=0;i<numOfArgs;i++)
+            free(args[i]);
+        return;
+    }
     else
         std::cout << "signal number " << sig << " was sent to pid " << pid << std::endl;
     for (int i = 0; i < numOfArgs; ++i)
@@ -266,6 +274,9 @@ void ForegroundCommand::execute() {
             jobs->setForeground(pid);
             waitpid(pid, NULL, 0);
             jobs->removeJobById(job_id);
+    }
+    for(int i=0;i<numOfArgs;i++){
+        free(args[i]);
     }
 }
 
@@ -354,7 +365,7 @@ void QuitCommand::execute() {
     jobs->killAllJobs();
     for(int i=0;i<numOfArgs;i++)
         free(args[i]);
-    exit(0);
+
 }
 
 bool operator==(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2){
@@ -420,10 +431,12 @@ JobsList::JobEntry* JobsList::getLastStoppedJob(int *jobId){
 }
 
 void JobsList::removeJobById(int jobId) {
-    list<JobEntry>::const_iterator i;
+    list<JobEntry>::iterator i;
     for(i=this->job_list.begin();i!=this->job_list.end();i++)
         if(i->job_id==jobId) {
+            Command* temp=i->getCommandPointer();
             job_list.erase(i);
+            delete temp;
             return;
         }
 }
@@ -453,7 +466,9 @@ void JobsList::removeFinishedJobs() {
     while(pid > 0){
         for (i = job_list.begin(); i!=job_list.end(); ++i){
             if ((*i).pid == pid) {
+                Command* temp=i->getCommandPointer();
                 job_list.erase(i);
+                delete temp;
                 break;
             }
         }
@@ -486,13 +501,14 @@ void JobsList::printForQuit() const{
 
 }
 void JobsList::killAllJobs() {
-    list<JobEntry>::const_iterator i;
+    list<JobEntry>::iterator i;
     for(i=job_list.begin();i!=job_list.end();++i){
         if(kill(i->pid,SIGKILL) == -1)
             perror("smash error: kill failed");
         else{
             waitpid(i->pid,NULL,0);
         }
+        delete i->getCommandPointer();
     }
     job_list.clear();
 }
@@ -512,7 +528,8 @@ SmallShell::SmallShell() :jobs(JobsList()),prompt("smash> "),
         previous_path(nullptr) {}
 
 SmallShell::~SmallShell() {
-// TODO: add your implementation
+    jobs.killAllJobs();
+    delete[] previous_path;
 }
 
 /**
@@ -565,6 +582,10 @@ void SmallShell::executeCommand(const char *cmd_line) {
   jobs.removeFinishedJobs();
   if (dynamic_cast<BuiltInCommand*>(cmd) != nullptr){
       cmd->execute();
+      if(dynamic_cast<QuitCommand*>(cmd)!= nullptr){
+          delete cmd;
+          exit(0);
+      }
       delete cmd;
   }
   else if (dynamic_cast<ExternalCommand*>(cmd) != nullptr){
@@ -574,21 +595,21 @@ void SmallShell::executeCommand(const char *cmd_line) {
               setpgrp();
               cmd->execute();
           }
-
           else{
               jobs.addJob(cmd, pid);
           }
       }
       else{
           pid_t pid = fork();
-          int new_job_id=jobs.getMaxJobId()+1;
           if (pid == 0) {
               setpgrp();
               cmd->execute();
           }
           else {
               jobs.setForeground(pid);
+              jobs.addJob(cmd,pid);
               waitpid(pid, NULL, 0);
+              jobs.removeJobById(jobs.getMaxJobId());
               jobs.setForeground(-1);
           }
       }
