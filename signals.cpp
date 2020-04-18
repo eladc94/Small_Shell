@@ -33,10 +33,6 @@ void ctrlCHandler(int sig_num) {
             perror("smash error: kill failed");
             return;
         }
-        if (-1 == waitpid(fg,NULL,0)){
-            perror("smash error: waitpid failed");
-        }
-        smash.getJobList()->removeJobByPid(fg);
         cout << "smash: process " << fg << " was killed" << endl;
         smash.getJobList()->setForeground(-1);
     }

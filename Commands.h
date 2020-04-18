@@ -22,14 +22,14 @@ enum Status{
 
 class Command {
 protected:
-    const char* cmd_line;
+    const shared_ptr<const char> cmd_line;
 public:
     explicit Command(const char* cmd_line) : cmd_line(cmd_line){}
-    virtual ~Command(){delete[] cmd_line;}
+    virtual ~Command()= default;
     virtual void execute() = 0;
     //virtual void prepare();
     //virtual void cleanup();
-    const char* getCommandLine() const {return cmd_line;}
+    const char* getCommandLine() const {return cmd_line.get();}
     // TODO: Add your extra methods if needed
 };
 
@@ -63,6 +63,7 @@ public:
     explicit RedirectionCommand(const char* cmd_line);
     ~RedirectionCommand() override = default;
     void execute() override;
+    string getInternal() const {return internal_cmd;}
   //void prepare() override;
   //void cleanup() override;
 };
