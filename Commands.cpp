@@ -199,17 +199,17 @@ void KillCommand::execute() {
     strcpy(cmd_no_ampersand,cmd_line);
     _removeBackgroundSign(cmd_no_ampersand);
     int numOfArgs = _parseCommandLine(cmd_no_ampersand, args);
-    //if (args[1][0] != '-')
     if (numOfArgs != 3){
         perror("smash error: kill: invalid arguments");
         for (int i = 0; i < numOfArgs; ++i)
             free(args[i]);
         return;
     }
-    //check format of ints
+    //TODO: check format of ints
     int sig = stoi(args[1], nullptr);
-    int pid = stoi(args[2], nullptr);
+    int job_id = stoi(args[2], nullptr);
     sig = sig*(-1);
+    pid_t pid = jobs->getPidByJobID(job_id);
     if (kill(pid, sig) == -1) {
         perror("smash error: kill failed");
         for(int i=0;i<numOfArgs;i++)
@@ -271,8 +271,12 @@ void ForegroundCommand::execute() {
             perror("smash error: kill failed");
     else{
             jobs->setForeground(pid);
-            waitpid(pid, NULL, WUNTRACED);
-            if (Stopped != jobs->getJobByPid(pid)->getStatus())
+            int status;
+            if (-1 == waitpid(pid, &status, WUNTRACED)) {
+                perror("smash error: waitpid failed");
+                return;
+            }
+            if (!WIFSTOPPED(status))
                 jobs->removeJobById(job_id);
     }
     for(int i=0;i<numOfArgs;i++){
@@ -515,7 +519,8 @@ void JobsList::killAllJobs() {
         if(kill(i->pid,SIGKILL) == -1)
             perror("smash error: kill failed");
         else{
-            waitpid(i->pid,NULL,0);
+            if (-1 == waitpid(i->pid,NULL,0))
+                perror("smash error: waitpid failed");
         }
     }
     job_list.clear();
