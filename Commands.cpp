@@ -290,6 +290,8 @@ void BackgroundCommand::execute() {
         for(int i=0;i<numOfArgs;i++)
             free(args[i]);
         perror("smash error: bg: invalid arguments");
+        for(int i=0;i<numOfArgs;i++)
+            free(args[i]);
         return;
     }
     else if(numOfArgs==2){
@@ -323,26 +325,29 @@ void BackgroundCommand::execute() {
             }
         }
         if(flag){
-            free(args[0]);
-            free(args[1]);
+            for (int i = 0; i < numOfArgs; ++i) {
+                free(args[i]);
+            }
             return;
         }
         job->setStatus(Running);
     }
     else{
+        free(args[0]);
         JobsList::JobEntry* job = jobs->getLastStoppedJob(&job_id);
         if(nullptr == job){
             perror("smash error: bg: there is no stopped jobs to resume");
-            free(args[0]);
             return;
         }
         pid_t pid=jobs->getPidByJobID(job_id);
         if(kill(pid,SIGCONT) == -1){
             perror("smash error: kill failed");
+            return;
         }
-        free(args[0]);
+        job->setStatus(Running);
     }
 }
+//why exit? not return?
 void ExternalCommand::execute() {
     _removeBackgroundSign((char*)cmd_line);
     char* args[4]={(char*)"/bin/bash",(char*)"-c",(char*)cmd_line,NULL};
