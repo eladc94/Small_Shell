@@ -19,6 +19,7 @@ void ctrlZHandler(int sig_num) {
         perror("smash error: kill failed");
         return;
     }
+    job->setTime(time(NULL));
     smash.getJobList()->setForeground(-1);
     cout << "smash: process " << fg << " was stopped" << endl;
 }

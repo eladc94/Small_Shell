@@ -290,8 +290,6 @@ void BackgroundCommand::execute() {
         for(int i=0;i<numOfArgs;i++)
             free(args[i]);
         perror("smash error: bg: invalid arguments");
-        for(int i=0;i<numOfArgs;i++)
-            free(args[i]);
         return;
     }
     else if(numOfArgs==2){
@@ -347,7 +345,7 @@ void BackgroundCommand::execute() {
         job->setStatus(Running);
     }
 }
-//why exit? not return?
+
 void ExternalCommand::execute() {
     _removeBackgroundSign((char*)cmd_line);
     char* args[4]={(char*)"/bin/bash",(char*)"-c",(char*)cmd_line,NULL};
@@ -356,7 +354,6 @@ void ExternalCommand::execute() {
         perror("smash error: execv failed");
         exit(0);
     }
-
 }
 
 void QuitCommand::execute() {
@@ -499,7 +496,6 @@ void JobsList::removeFinishedJobs() {
 void JobsList::printJobsList() const{
     list<JobEntry>::const_iterator i;
     list<JobEntry> temp = job_list;
-    temp.sort();
     for (i = temp.begin(); i != temp.end(); ++i){
         std::cout<<(*i)<<endl;
     }
@@ -628,10 +624,11 @@ void SmallShell::executeCommand(const char *cmd_line) {
                   setpgrp();
                   cmd->execute();
               } else {
-                  jobs.setForeground(pid);
+                jobs.setForeground(pid);
                 jobs.addJob(cmd,pid);
-                waitpid(pid, NULL, WUNTRACED);
-                if (Stopped != jobs.getJobByPid(pid)->getStatus())
+                int status;
+                waitpid(pid, &status, WUNTRACED);
+                if (!WIFSTOPPED(status))
                     jobs.removeJobById(jobs.getMaxJobId());
                 jobs.setForeground(-1);
               }
