@@ -55,7 +55,10 @@ public:
 };
 
 class RedirectionCommand : public Command {
- // TODO: Add your data members
+    string file_name;
+    string internal_cmd;
+    bool single_arrow;
+    bool background;
 public:
     explicit RedirectionCommand(const char* cmd_line);
     ~RedirectionCommand() override = default;
@@ -92,27 +95,6 @@ class QuitCommand : public BuiltInCommand {
 public:
     QuitCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line),jobs(jobs){}
     ~QuitCommand() override = default;
-    void execute() override;
-};
-
-class CommandsHistory {
-protected:
-    class CommandHistoryEntry {
-	  // TODO: Add your data members
-    };
- // TODO: Add your data members
-public:
-    CommandsHistory();
-    ~CommandsHistory()  =default;
-    void addRecord(const char* cmd_line);
-    void printHistory();
-};
-
-class HistoryCommand : public BuiltInCommand {
- // TODO: Add your data members
-public:
-    HistoryCommand(const char* cmd_line, CommandsHistory* history);
-    ~HistoryCommand() override = default;
     void execute() override;
 };
 

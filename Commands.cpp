@@ -5,6 +5,9 @@
 #include <sys/wait.h>
 #include <iomanip>
 #include "Commands.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 using namespace std;
 
@@ -377,6 +380,57 @@ void QuitCommand::execute() {
         free(args[i]);
 }
 
+RedirectionCommand::RedirectionCommand(const char* cmd_line): Command(cmd_line), file_name(""), internal_cmd(""),
+                                          single_arrow(true), background(false){
+    char cmd[COMMAND_ARGS_MAX_LENGTH];
+    strcpy(cmd, cmd_line);
+    if (_isBackgroundCommand(cmd))
+        background = true;
+    _removeBackgroundSign(cmd);
+    char* args[COMMAND_MAX_ARGS];
+    int num_of_args = _parseCommandLine(cmd, args);
+    file_name = args[num_of_args-1];
+    if (strcmp(args[num_of_args-2], ">>") == 0)
+        single_arrow = false;
+    for (int i = 0; i<num_of_args-2; ++i){
+        internal_cmd += args[i];
+        internal_cmd += " ";
+    }
+    if (_isBackgroundCommand(internal_cmd.c_str()))
+        background = true;
+    for (int i = 0; i<num_of_args; ++i)
+        free(args[i]);
+}
+
+void RedirectionCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    Command* internal = smash.CreateCommand(internal_cmd.c_str());
+    pid_t pid = fork();
+    if (pid == 0){
+        setpgrp();
+        close(1);
+        if (single_arrow)
+            open(file_name.c_str(),O_WRONLY|O_CREAT);
+        else
+            open(file_name.c_str(),O_WRONLY|O_CREAT|O_APPEND);
+        internal->execute();
+    }
+    else{
+        JobsList* jobs = smash.getJobList();
+        if(background)
+           jobs->addJob(this, pid);
+        else{
+            jobs->setForeground(pid);
+            jobs->addJob(this, pid);
+            int status;
+            waitpid(pid, &status, WUNTRACED);
+            if (!WIFSTOPPED(status))
+                jobs->removeJobById(jobs->getMaxJobId());
+            jobs->setForeground(-1);
+        }
+    }
+}
+
 bool operator==(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2){
     return je1.job_id==je2.job_id;
 }
@@ -568,20 +622,26 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {//check if & was supp
     char* cmd = new char[COMMAND_ARGS_MAX_LENGTH];
     strcpy(cmd, cmd_line);
     Command* temp= nullptr;
-    if ("chprompt" == command){
-        temp= new ChangePromptCommand(cmd, &prompt);
+    if ((num_of_args >= 3 && ((strcmp(args[num_of_args-2], ">") == 0) || (strcmp(args[num_of_args-2],">>") == 0)))
+    ||(num_of_args >=4 && ((strcmp(args[num_of_args-3], ">") == 0) || (strcmp(args[num_of_args-3],">>") == 0)))){
+        string file_path = args[num_of_args-1];
+
+        temp = new RedirectionCommand(cmd);
+    }
+    else if ("chprompt" == command){
+        temp = new ChangePromptCommand(cmd, &prompt);
     }
     else if ("showpid" == command){
-        temp= new ShowPidCommand(cmd);
+        temp = new ShowPidCommand(cmd);
     }
     else if ("pwd" == command){
-        temp= new GetCurrDirCommand(cmd);
+        temp = new GetCurrDirCommand(cmd);
     }
     else if("cd" == command){
-        temp= new ChangeDirCommand(cmd, &previous_path);
+        temp = new ChangeDirCommand(cmd, &previous_path);
     }
     else if("jobs" == command){
-        temp= new JobsCommand(cmd,&jobs);
+        temp = new JobsCommand(cmd,&jobs);
     }
     else if("kill" == command){
         temp = new KillCommand(cmd, &jobs);
@@ -638,6 +698,10 @@ void SmallShell::executeCommand(const char *cmd_line) {
                 jobs.setForeground(-1);
               }
           }
+    }
+    else if (dynamic_cast<RedirectionCommand*>(cmd) != nullptr){
+        cmd->execute();
+        delete cmd;
     }
 }
 
