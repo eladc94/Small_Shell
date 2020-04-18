@@ -12,7 +12,6 @@ using std::list;
 using std::ostream;
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
-#define HISTORY_MAX_RECORDS (50)
 
 enum Status{
     Running,
@@ -136,9 +135,8 @@ public:
     JobEntry * getJobByPid(int pid);
     pid_t getPidByJobID(int job_id);
     JobEntry *getLastStoppedJob(int *jobId);
-    JobEntry * getLastJob(int* lastJobId);
+    //JobEntry * getLastJob(int* lastJobId);
     void removeJobById(int jobId);
-    void removeJobByPid(int pid);
     int getMaxJobId() const;
     void setForeground(int fg);
     void printJobsList() const;
@@ -181,9 +179,9 @@ public:
 
 
 // TODO: should it really inhirit from BuiltInCommand ?
-class CopyCommand : public BuiltInCommand {
+class CopyCommand : public Command {
 public:
-    CopyCommand(const char* cmd_line);
+    explicit CopyCommand(const char* cmd_line) :Command(cmd_line){}
     ~CopyCommand() override = default;
     void execute() override;
 };
