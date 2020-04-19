@@ -21,14 +21,14 @@ enum Status{
 
 class Command {
 protected:
-    const shared_ptr<const char> cmd_line;
+    const char* cmd_line;
 public:
     explicit Command(const char* cmd_line) : cmd_line(cmd_line){}
-    virtual ~Command()= default;
+    virtual ~Command() {delete[] cmd_line;}
     virtual void execute() = 0;
     //virtual void prepare();
     //virtual void cleanup();
-    const char* getCommandLine() const {return cmd_line.get();}
+    const char* getCommandLine() const {return cmd_line;}
     // TODO: Add your extra methods if needed
 };
 
@@ -55,14 +55,14 @@ public:
 
 class RedirectionCommand : public Command {
     string file_name;
-    string internal_cmd;
+    string internal_cmd_line;
     bool single_arrow;
     bool background;
 public:
     explicit RedirectionCommand(const char* cmd_line);
     ~RedirectionCommand() override = default;
     void execute() override;
-    string getInternal() const {return internal_cmd;}
+    string getInternal() const {return internal_cmd_line;}
   //void prepare() override;
   //void cleanup() override;
 };
@@ -138,7 +138,7 @@ public:
     //JobEntry * getLastJob(int* lastJobId);
     void removeJobById(int jobId);
     int getMaxJobId() const;
-    void setForeground(int fg);
+    void setForeground(pid_t pid){foreground=pid;}
     void printJobsList() const;
     void printForQuit() const;
     void killAllJobs();
@@ -177,11 +177,9 @@ public:
     void execute() override;
 };
 
-
-// TODO: should it really inhirit from BuiltInCommand ?
-class CopyCommand : public Command {
+class CopyCommand : public ExternalCommand {
 public:
-    explicit CopyCommand(const char* cmd_line) :Command(cmd_line){}
+    explicit CopyCommand(const char* cmd_line) :ExternalCommand(cmd_line){}
     ~CopyCommand() override = default;
     void execute() override;
 };
@@ -200,6 +198,7 @@ public:
 class SmallShell {
 private:
     JobsList jobs;
+    pid_t smash_pid;
     string prompt;
     char* previous_path;
     SmallShell();
