@@ -459,17 +459,40 @@ void CopyCommand::execute() {
         return;
     int fd_read=open(src_name.c_str(), O_RDONLY);
     int fd_write=open(dst_name.c_str(), O_WRONLY|O_CREAT|O_TRUNC);
-    char read_string[READ_SIZE];
-    int read_bits=read(fd_read,read_string,READ_SIZE);
-    while(read_bits>0){
-        write(fd_write,read_string,read_bits);
-        read_bits=read(fd_read,read_string,READ_SIZE);
+    if( fd_read == SYSCALL_ERROR || fd_write=SYSCALL_ERROR){
+        perror("smash error: open failed");
+        for(int i=0;i<numOfArgs;i++)
+            free(args[i]);
+        return;
     }
-    close(fd_write);
-    close(fd_read);
-    for(int i=0;i<numOfArgs;i++)
-        free(args[i]);
-    return;
+    char read_string[READ_SIZE];
+    bool read_error=false;
+    int read_bits=read(fd_read,read_string,READ_SIZE);
+    if(read_bits == SYSCALL_ERROR)
+       read_error=true;
+    while(read_bits>0){
+        int write_bits=write(fd_write,read_string,read_bits);
+        if(write_bits == SYSCALL_ERROR){
+            perror("smash error: write failed");
+            for(int i=0;i<numOfArgs;i++)
+                free(args[i]);
+            return;
+        }
+        read_bits=read(fd_read,read_string,READ_SIZE);
+        if(read_bits == SYSCALL_ERROR)
+            read_error=true;
+    }
+    if(read_error){
+        perror("smash error: read failed");
+        for(int i=0;i<numOfArgs;i++)
+            free(args[i]);
+        return;
+    }
+    int flag1=close(fd_write);
+    int flag2=close(fd_read);
+   if(flag1 == SYSCALL_ERROR || flag2==SYSCALL_ERROR) {
+       perror("smash error: close failed");
+    }
     for(int i=0;i<numOfArgs;i++)
         free(args[i]);
 }
