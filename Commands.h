@@ -18,8 +18,6 @@ enum Status{
     Stopped,
 };
 
-bool _isRedirectionCommand(const char* cmd_line);
-int sendToBash(const char* cmd_line);
 
 class Command {
 protected:
@@ -38,9 +36,11 @@ public:
 };
 
 class PipeCommand : public Command {
-  // TODO: Add your data members
+    string cmd1;
+    string cmd2;
+    bool ampersend;
 public:
-    PipeCommand(const char* cmd_line);
+    explicit PipeCommand(const char* cmd_line, int sign_pos);
     ~PipeCommand() override = default;
     void execute() override;
 };
@@ -51,7 +51,7 @@ class RedirectionCommand : public Command {
     bool single_arrow;
     bool background;
 public:
-    explicit RedirectionCommand(const char* cmd_line,int arrow_pos);
+    explicit RedirectionCommand(const char* cmd_line, int arrow_pos);
     ~RedirectionCommand() override = default;
     void execute() override;
     string getInternal() const {return internal_cmd_line;}
@@ -104,8 +104,7 @@ public:
         Status getStatus() const {return status;}
         void setTime(time_t time){start_time=time;}
         void setStatus(Status st){status=st;}
-
-
+        const char* getJobCommandLine() const{return cmd->getCommandLine();}
         friend bool operator==(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2);
         friend bool operator!=(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2);
         friend bool operator<(const JobEntry& je1,const JobEntry& je2);
@@ -116,8 +115,9 @@ public:
 private:
     list<JobEntry> job_list;
     pid_t foreground;
+    bool fg_pipe;
 public:
-    JobsList() : job_list(list<JobEntry>()), foreground(-1){}
+    JobsList() : job_list(list<JobEntry>()), foreground(-1), fg_pipe(false){}
     ~JobsList()= default;
     void addJob(Command* cmd, pid_t pid, bool isStopped = false);
     void removeFinishedJobs();
@@ -129,10 +129,12 @@ public:
     void removeJobById(int jobId);
     int getMaxJobId() const;
     void setForeground(pid_t pid){foreground=pid;}
+    void setFgPipe(bool flag){fg_pipe = flag;}
     void printJobsList() const;
     void printForQuit() const;
     void killAllJobs();
     pid_t getForeground();
+    bool getFgPipe() const{return fg_pipe;}
 };
 
 class JobsCommand : public BuiltInCommand {

@@ -8,6 +8,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <signal.h>
+#include "signals.h"
 
 using namespace std;
 
@@ -26,6 +28,7 @@ const int EXECV_ARRAY_SIZE = 4;
 const int KILL_ARGS = 3;
 const int BFG_ARGS = 2;
 const int STDOUT_FD = 1;
+const int STDERR_FD = 2;
 const int READ_SIZE=1000;
 
 const int KILL_SIG_ARG = 1;
@@ -91,10 +94,10 @@ bool _isBackgroundCommand(const char* cmd_line) {
   return str[str.find_last_not_of(WHITESPACE)] == '&';
 }
 
-bool _isRedirectionCommand(const char* cmd_line,int* arrow_pos){
+bool _isRedirectionOrPipe(const char* cmd_line, int* arrow_pos, char sign){
    int len=strlen(cmd_line);
    for(int i=0;i<len;i++){
-       if(cmd_line[i] == '>'){
+       if(cmd_line[i] == sign){
            *arrow_pos = i;
            return true;
        }
@@ -141,7 +144,8 @@ void ChangePromptCommand::execute() {
 }
 
 void ShowPidCommand::execute() {
-    std::cout << "smash pid is: " << getpid() << std::endl;
+    SmallShell& smash = SmallShell::getInstance();
+    std::cout << "smash pid is: " << smash.getPid() << std::endl;
 }
 
 void GetCurrDirCommand::execute() {
@@ -295,6 +299,12 @@ void ForegroundCommand::execute() {
     }
     else{
             jobs->setForeground(pid);
+            int temp;
+            pid_t gpd = getpgid(pid);
+            if (_isRedirectionOrPipe(jobs->getJobByPid(pid)->getJobCommandLine(), &temp,'|')) {
+                jobs->setFgPipe(true);
+                killpg(gpd,SIGCONT);
+            }
             int status;
             if (SYSCALL_ERROR == waitpid(pid, &status, WUNTRACED)) {
                 perror("smash error: waitpid failed");
@@ -303,6 +313,8 @@ void ForegroundCommand::execute() {
             }
             if (!WIFSTOPPED(status))
                 jobs->removeJobById(job_id);
+            jobs->setForeground(-1);
+            jobs->setFgPipe(false);
     }
     FREE_PARSE();
 }
@@ -342,6 +354,12 @@ void BackgroundCommand::execute() {
             else if (kill(pid, SIGCONT) == SYSCALL_ERROR) {
                 perror("smash error: kill failed");
                 flag=true;
+            }
+            int temp;
+            pid_t gpd = getpgid(pid);
+            if (_isRedirectionOrPipe(jobs->getJobByPid(pid)->getJobCommandLine(), &temp,'|')) {
+                jobs->setFgPipe(true);
+                killpg(gpd, SIGCONT);
             }
         }
         if(flag){
@@ -670,9 +688,12 @@ Command * SmallShell::CreateCommand(const char* cmd_line){
     char* cmd = new char[COMMAND_ARGS_MAX_LENGTH];
     strcpy(cmd, cmd_line);
     Command* temp= nullptr;
-    int arrow_pos=NO_ARROW;
-    if (_isRedirectionCommand(cmd_line,&arrow_pos)){
-            temp = new RedirectionCommand(cmd,arrow_pos);
+    int sign_pos=NO_ARROW;
+    if (_isRedirectionOrPipe(cmd_line, &sign_pos, '>')){
+            temp = new RedirectionCommand(cmd, sign_pos);
+    }
+    else if (_isRedirectionOrPipe(cmd_line,&sign_pos,'|')) {
+        temp = new PipeCommand(cmd, sign_pos);
     }
     else if ("chprompt" == command){
         temp = new ChangePromptCommand(cmd, &prompt);
@@ -745,7 +766,8 @@ void SmallShell::executeCommand(const char *cmd_line) {
                     jobs.setForeground(-1);
                 }
         }
-    } else if (dynamic_cast<RedirectionCommand *>(cmd) != nullptr) {
+    }
+    else if (dynamic_cast<RedirectionCommand *>(cmd) != nullptr) {
         auto temp = dynamic_cast<RedirectionCommand*>(cmd);
         string internal_cmd_line = temp->getInternal();
         Command *internal_cmd = CreateCommand(internal_cmd_line.c_str());
@@ -781,7 +803,110 @@ void SmallShell::executeCommand(const char *cmd_line) {
         }
         delete internal_cmd;
     }
+    else if (dynamic_cast<PipeCommand*>(cmd) != nullptr){
+        pid_t pid = fork();
+        if (-1 == pid){
+            perror("smash error: fork failed");
+            return;
+        }
+        else if (0 == pid){
+            setpgrp();
+            cmd->execute();
+            delete cmd;
+            exit(0);
+        }
+        else{
+            bool background = _isBackgroundCommand(cmd_line);
+            if (background) {
+                jobs.addJob(cmd, pid);
+            }
+            else {
+                jobs.setForeground(pid);
+                jobs.setFgPipe(true);
+                jobs.addJob(cmd, pid);
+                int status;
+                if (SYSCALL_ERROR == waitpid(pid, &status, WUNTRACED)) {
+                    perror("smash error: waitpid failed");
+                }
+                if (!WIFSTOPPED(status))
+                    jobs.removeJobById(jobs.getMaxJobId());
+                jobs.setForeground(-1);
+                jobs.setFgPipe(false);
+            }
+        }
+    }
 }
 JobsList *SmallShell::getJobList() {
     return &jobs;
+}
+
+PipeCommand::PipeCommand(const char *cmd_line, int sign_pos) : Command(cmd_line), cmd1(""), cmd2(""),
+ampersend(false) {
+    char cmd[COMMAND_ARGS_MAX_LENGTH];
+    strcpy(cmd, cmd_line);
+    _removeBackgroundSign(cmd);
+    char* args[COMMAND_MAX_ARGS];
+    int numOfArgs = _parseCommandLine(cmd, args);
+    for(int i=0;i<sign_pos ;i++)
+        cmd1.push_back(cmd[i]);
+    int len=strlen(cmd);
+    if(sign_pos<len-1)
+        if(cmd[sign_pos+1]=='&'){
+            ampersend = true;
+            sign_pos++;
+        }
+    for(int i=sign_pos+1;i<len;i++)
+        cmd2.push_back(cmd[i]);
+    FREE_PARSE();
+}
+
+void PipeCommand::execute() {
+    int my_pipe[2];
+    pipe(my_pipe);
+    pid_t left = fork();
+    SmallShell& smash = SmallShell::getInstance();
+    if (-1 == left){
+        perror("smash error: fork failed");
+        return;
+    }
+    else if (0 == left){
+        int to_close = STDOUT_FD;
+        if (ampersend)
+            to_close = STDERR_FD;
+        close(my_pipe[0]);
+        close(to_close);
+        dup2(my_pipe[1],to_close);
+        Command* left_cmd = smash.CreateCommand(cmd1.c_str());
+        left_cmd->execute();
+        delete left_cmd;
+        exit(0);
+    }
+    else {
+        close(my_pipe[1]);
+        pid_t right = fork();
+        if (-1 == right) {
+            perror("smash error: fork failed");
+            return;
+        }
+        else if (0 == right) {
+            close(0);
+            dup2(my_pipe[0], 0);
+            Command *right_cmd = smash.CreateCommand(cmd2.c_str());
+            right_cmd->execute();
+            delete right_cmd;
+            exit(0);
+        }
+        else{
+            close(my_pipe[0]);
+            signal(SIGINT,ctrlCPipeHandler);
+            signal(SIGTSTP, ctrlZPipeHandler);
+            //signal(SIGCONT, sigcontPipeHandler);
+            int status;
+            if (SYSCALL_ERROR == waitpid(left, &status, WUNTRACED))
+                perror("smash error: waitpid failed");
+            if (SYSCALL_ERROR == waitpid(right, &status, WUNTRACED))
+                perror("smash error: waitpid failed");
+            return;
+        }
+    }
 }
