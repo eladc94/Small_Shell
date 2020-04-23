@@ -16,14 +16,23 @@ const char* CHDIR_PREV = "-";
 const int CHDIR_MAX_ARG = 2;
 const int MIN_SIG_NUM = 1;
 const int MAX_SIG_NUM = 31;
-const int EXECV_ARRAY_SIZE = 4;
-const int KILL_ARGS = 3;
-const int BFG_ARGS = 2;
+const mode_t OPEN_MODE = 0666;
+
+const int NO_ARROW = -1;
 const int DOES_NOT_EXIST = -1;
 const pid_t PID_NOT_EXIST = -1;
 const int SYSCALL_ERROR = -1;
+const int EXECV_ARRAY_SIZE = 4;
+const int KILL_ARGS = 3;
+const int BFG_ARGS = 2;
 const int STDOUT_FD = 1;
 const int READ_SIZE=1000;
+
+const int KILL_SIG_ARG = 1;
+const int KILL_JOB_ARG = 2;
+const int BFG_JOB_ARG = 1;
+const int COPY_SRC_ARG = 1;
+const int COPY_DST_ARG = 2;
 
 
 #if 0
@@ -37,6 +46,9 @@ const int READ_SIZE=1000;
 #define FUNC_EXIT()
 #endif
 #define MAX_ARGUMENTS 20
+#define FREE_PARSE() \
+for (int i=0;i<numOfArgs;i++) \
+    free(args[i])
 #define DEBUG_PRINT cerr << "DEBUG: "
 
 #define EXEC(path, arg) \
@@ -79,6 +91,17 @@ bool _isBackgroundCommand(const char* cmd_line) {
   return str[str.find_last_not_of(WHITESPACE)] == '&';
 }
 
+bool _isRedirectionCommand(const char* cmd_line,int* arrow_pos){
+   int len=strlen(cmd_line);
+   for(int i=0;i<len;i++){
+       if(cmd_line[i] == '>'){
+           *arrow_pos = i;
+           return true;
+       }
+   }
+   return false;
+}
+
 void _removeBackgroundSign(char* cmd_line) {
   const string str(cmd_line);
   // find last character other than spaces
@@ -97,6 +120,11 @@ void _removeBackgroundSign(char* cmd_line) {
   cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
+int sendToBash(char* cmd_line){
+    char* args[EXECV_ARRAY_SIZE]={(char*)"/bin/bash",(char*)"-c",cmd_line,NULL};
+    return execv(args[0],args);
+}
+
 void ChangePromptCommand::execute() {
     char* args[MAX_ARGUMENTS];
     char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
@@ -109,8 +137,7 @@ void ChangePromptCommand::execute() {
         (*new_prompt) = args[1];
         (*new_prompt)+="> ";
     }
-    for(int i=0;i<numOfArgs;i++)
-        free(args[i]);
+    FREE_PARSE();
 }
 
 void ShowPidCommand::execute() {
@@ -135,8 +162,7 @@ void ChangeDirCommand::execute() {
     int numOfArgs = _parseCommandLine(cmd_no_ampersand, args);
     if (numOfArgs > CHDIR_MAX_ARG){
         perror("smash error: cd: too many arguments");
-        for(int i=0;i<numOfArgs;i++)
-            free(args[i]);
+        FREE_PARSE();
         return;
     }
     if(numOfArgs<=1) {
@@ -148,8 +174,7 @@ void ChangeDirCommand::execute() {
     char* curr = get_current_dir_name();
     if(NULL == curr){
         perror("smash error: get_current_dir_name failed");
-        free(args[0]);
-        free(args[1]);
+        FREE_PARSE();
         return;
     }
     char * dst;
@@ -157,8 +182,7 @@ void ChangeDirCommand::execute() {
         if (NULL == *plastPwd) {
             perror("smash error: cd: OLDPWD not set");
             free(curr);
-            free(args[0]);
-            free(args[1]);
+            FREE_PARSE();
             return;
         }
         dst = *plastPwd;
@@ -167,15 +191,13 @@ void ChangeDirCommand::execute() {
     if (chdir(dst) != 0) {
         perror("smash error: chdir failed");
         free(curr);
-        free(args[0]);
-        free(args[1]);
+        FREE_PARSE();
         return;
     }
     delete[] (*plastPwd);
     *plastPwd=new char[COMMAND_ARGS_MAX_LENGTH];
     strcpy(*plastPwd, curr);
-    for(int i=0;i<numOfArgs;i++)
-        free(args[i]);
+    FREE_PARSE();
     free(curr);
 }
 
@@ -184,7 +206,6 @@ void JobsCommand::execute() {
     jobs->printJobsList();
 }
 
-//check that job id exists
 void KillCommand::execute() {
     char* args[MAX_ARGUMENTS];
     char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
@@ -193,46 +214,40 @@ void KillCommand::execute() {
     int numOfArgs = _parseCommandLine(cmd_no_ampersand, args);
     if (numOfArgs != KILL_ARGS){
         perror("smash error: kill: invalid arguments");
-        for (int i = 0; i < numOfArgs; ++i)
-            free(args[i]);
+        FREE_PARSE();
         return;
     }
         int sig=0,job_id=DOES_NOT_EXIST;
     try {
-        sig = stoi(args[1], nullptr);
-        job_id = stoi(args[2], nullptr);
+        sig = stoi(args[KILL_SIG_ARG], nullptr);
+        job_id = stoi(args[KILL_JOB_ARG], nullptr);
     }
     catch(const std::invalid_argument& ie){
         perror("smash error: kill: invalid arguments");
-        for(int i=0;i<numOfArgs;i++)
-            free(args[i]);
+        FREE_PARSE();
         return;
     }
     sig = sig*(-1);
     if(sig<MIN_SIG_NUM||sig>MAX_SIG_NUM){
         perror("smash error: kill: invalid arguments");
-        for(int i=0;i<numOfArgs;i++)
-            free(args[i]);
+        FREE_PARSE();
         return;
     }
     pid_t pid = jobs->getPidByJobID(job_id);
     if(PID_NOT_EXIST == pid){
         string error_msg="smash error: kill: job-id "+to_string(job_id)+" does not exist";
         perror(error_msg.c_str());
-        for(int i=0;i<numOfArgs;i++)
-            free(args[i]);
+        FREE_PARSE();
         return;
     }
     if (kill(pid, sig) == SYSCALL_ERROR) {
         perror("smash error: kill failed");
-        for(int i=0;i<numOfArgs;i++)
-            free(args[i]);
+        FREE_PARSE();
         return;
     }
     else
         std::cout << "signal number " << sig << " was sent to pid " << pid << std::endl;
-    for (int i = 0; i < numOfArgs; ++i)
-        free(args[i]);
+    FREE_PARSE();
 }
 
 void ForegroundCommand::execute() {
@@ -250,12 +265,11 @@ void ForegroundCommand::execute() {
     }
     else if (numOfArgs == BFG_ARGS) {
         try {
-            job_id = stoi(args[1], nullptr);
+            job_id = stoi(args[BFG_JOB_ARG], nullptr);
         }
         catch (const std::invalid_argument& ia){
             perror("smash error: fg: invalid arguments");
-            for (int i = 0; i < numOfArgs; ++i)
-                free(args[i]);
+            FREE_PARSE();
             return;
         }
         pid = jobs->getPidByJobID(job_id);
@@ -274,14 +288,12 @@ void ForegroundCommand::execute() {
         }
     }
     if (flag){
-        for (int i = 0; i < numOfArgs; ++i)
-            free(args[i]);
+        FREE_PARSE();
         return;
     }
     if (kill(pid, SIGCONT) == SYSCALL_ERROR) {
         perror("smash error: kill failed");
-        for (int i = 0; i < numOfArgs; ++i)
-            free(args[i]);
+        FREE_PARSE();
         return;
     }
     else{
@@ -289,17 +301,13 @@ void ForegroundCommand::execute() {
             int status;
             if (SYSCALL_ERROR == waitpid(pid, &status, WUNTRACED)) {
                 perror("smash error: waitpid failed");
-                for(int i=0;i<numOfArgs;i++){
-                    free(args[i]);
-                }
+                FREE_PARSE();
                 return;
             }
             if (!WIFSTOPPED(status))
                 jobs->removeJobById(job_id);
     }
-    for(int i=0;i<numOfArgs;i++){
-        free(args[i]);
-    }
+    FREE_PARSE();
 }
 
 void BackgroundCommand::execute() {
@@ -309,19 +317,17 @@ void BackgroundCommand::execute() {
     int numOfArgs=_parseCommandLine(cmd_no_ampersand,args);
     int job_id = DOES_NOT_EXIST;
     if(numOfArgs > BFG_ARGS){
-        for(int i=0;i<numOfArgs;i++)
-            free(args[i]);
+        FREE_PARSE();
         perror("smash error: bg: invalid arguments");
         return;
     }
     else if(numOfArgs == BFG_ARGS){
         try{
-            job_id=stoi(args[1], nullptr);
+            job_id=stoi(args[BFG_JOB_ARG], nullptr);
         }
         catch (const std::invalid_argument& ia){
             perror("smash error: bg: invalid arguments");
-            for (int i = 0; i < numOfArgs; ++i)
-                free(args[i]);
+            FREE_PARSE();
             return;
         }
         bool flag=false;
@@ -344,8 +350,7 @@ void BackgroundCommand::execute() {
             }
         }
         if(flag){
-            for (int i = 0; i < numOfArgs; ++i)
-                free(args[i]);
+            FREE_PARSE();
             return;
         }
         job->setStatus(Running);
@@ -363,16 +368,14 @@ void BackgroundCommand::execute() {
         }
         job->setStatus(Running);
     }
-    for(int i=0;i<numOfArgs;i++)
-        free(args[i]);
+    FREE_PARSE();
 }
 
 void ExternalCommand::execute() {
     char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
     strcpy(cmd_no_ampersand,cmd_line);
     _removeBackgroundSign(cmd_no_ampersand);
-    char* args[EXECV_ARRAY_SIZE]={(char*)"/bin/bash",(char*)"-c",cmd_no_ampersand,NULL};
-    int flag = execv(args[0],args);
+    int flag = sendToBash(cmd_no_ampersand);
     if (flag == SYSCALL_ERROR){
         perror("smash error: execv failed");
         exit(0);
@@ -393,30 +396,28 @@ void QuitCommand::execute() {
     if(kill)
         jobs->printForQuit();
     jobs->killAllJobs();
-    for(int i=0;i<numOfArgs;i++)
-        free(args[i]);
+    FREE_PARSE();
 }
 
-RedirectionCommand::RedirectionCommand(const char* cmd_line): Command(cmd_line), file_name(""), internal_cmd_line(""),
-                                          single_arrow(true), background(false){
+RedirectionCommand::RedirectionCommand(const char* cmd_line, int arrow_pos): Command(cmd_line), file_name(""),
+internal_cmd_line(""),single_arrow(true), background(false){
     char cmd[COMMAND_ARGS_MAX_LENGTH];
     strcpy(cmd, cmd_line);
     if (_isBackgroundCommand(cmd))
         background = true;
     _removeBackgroundSign(cmd);
     char* args[COMMAND_MAX_ARGS];
-    int num_of_args = _parseCommandLine(cmd, args);
-    file_name = args[num_of_args-1];
-    if (strcmp(args[num_of_args-2], ">>") == 0)
-        single_arrow = false;
-    for (int i = 0; i<num_of_args-2; ++i){
-        internal_cmd_line += args[i];
-        internal_cmd_line += " ";
-    }
-    if (_isBackgroundCommand(internal_cmd_line.c_str()))
-        background = true;
-    for (int i = 0; i<num_of_args; ++i)
-        free(args[i]);
+    int numOfArgs = _parseCommandLine(cmd, args);
+    for(int i=0;i<arrow_pos;i++)
+        internal_cmd_line.push_back(cmd[i]);
+    if(arrow_pos<strlen(cmd)-1)
+        if(cmd[arrow_pos+1]=='>'){
+            single_arrow = false;
+            arrow_pos++;
+        }
+    for(int i=arrow_pos+1;i<strlen(cmd);i++)
+        file_name.push_back(cmd[i]);
+    FREE_PARSE();
 }
 
 void RedirectionCommand::execute() {
@@ -427,19 +428,18 @@ void RedirectionCommand::execute() {
     close(STDOUT_FD);
     int fd;
     if (single_arrow)
-        fd = open(file_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC);
+        fd = open(file_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC,OPEN_MODE);
     else
-        fd = open(file_name.c_str(), O_WRONLY | O_CREAT | O_APPEND);
-    if (dynamic_cast<BuiltInCommand *>(internal_cmd) != nullptr) {
+        fd = open(file_name.c_str(), O_WRONLY | O_CREAT | O_APPEND,OPEN_MODE);
+    if (dynamic_cast<BuiltInCommand*>(internal_cmd) != nullptr) {
         internal_cmd->execute(); //can assume no & sign
         close(fd);
         delete internal_cmd;
         return;
     }
     else if (dynamic_cast<ExternalCommand *>(internal_cmd) != nullptr) {
-        char *args[EXECV_ARRAY_SIZE] = {(char *) "/bin/bash", (char *) "-c", internal_copy, NULL};
         delete internal_cmd;
-        int flag = execv(args[0], args);
+        int flag = sendToBash(internal_copy);
         if (flag == SYSCALL_ERROR) {
             perror("smash error: execv failed");
             close(fd);
@@ -453,16 +453,15 @@ void CopyCommand::execute() {
     char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
     strcpy(cmd_no_ampersand,cmd_line);
     int numOfArgs=_parseCommandLine(cmd_no_ampersand,args);
-    string src_name=args[1];
-    string dst_name=args[2];
+    string src_name=args[COPY_SRC_ARG];
+    string dst_name=args[COPY_DST_ARG];
     if(src_name==dst_name)
         return;
     int fd_read=open(src_name.c_str(), O_RDONLY);
-    int fd_write=open(dst_name.c_str(), O_WRONLY|O_CREAT|O_TRUNC);
-    if( fd_read == SYSCALL_ERROR || fd_write=SYSCALL_ERROR){
+    int fd_write=open(dst_name.c_str(), O_WRONLY|O_CREAT|O_TRUNC,OPEN_MODE);
+    if( fd_read == SYSCALL_ERROR || fd_write == SYSCALL_ERROR){
         perror("smash error: open failed");
-        for(int i=0;i<numOfArgs;i++)
-            free(args[i]);
+        FREE_PARSE();
         return;
     }
     char read_string[READ_SIZE];
@@ -474,8 +473,7 @@ void CopyCommand::execute() {
         int write_bits=write(fd_write,read_string,read_bits);
         if(write_bits == SYSCALL_ERROR){
             perror("smash error: write failed");
-            for(int i=0;i<numOfArgs;i++)
-                free(args[i]);
+            FREE_PARSE();
             return;
         }
         read_bits=read(fd_read,read_string,READ_SIZE);
@@ -484,8 +482,7 @@ void CopyCommand::execute() {
     }
     if(read_error){
         perror("smash error: read failed");
-        for(int i=0;i<numOfArgs;i++)
-            free(args[i]);
+        FREE_PARSE();
         return;
     }
     int flag1=close(fd_write);
@@ -493,8 +490,7 @@ void CopyCommand::execute() {
    if(flag1 == SYSCALL_ERROR || flag2==SYSCALL_ERROR) {
        perror("smash error: close failed");
     }
-    for(int i=0;i<numOfArgs;i++)
-        free(args[i]);
+    FREE_PARSE();
 }
 
 bool operator==(const JobsList::JobEntry& je1,const JobsList::JobEntry& je2){
@@ -657,6 +653,8 @@ SmallShell::SmallShell() : jobs(JobsList()),smash_pid(getpid()),prompt("smash> "
         previous_path(nullptr) {}
 
 SmallShell::~SmallShell() {
+    if(getpid() == smash_pid)
+        jobs.killAllJobs();
     delete[] previous_path;
 }
 
@@ -665,16 +663,14 @@ SmallShell::~SmallShell() {
 */
 Command * SmallShell::CreateCommand(const char* cmd_line){
     char* args[MAX_ARGUMENTS];
-    int num_of_args = _parseCommandLine(cmd_line, args);
+    int numOfArgs = _parseCommandLine(cmd_line, args);
     string command(args[0]);
     char* cmd = new char[COMMAND_ARGS_MAX_LENGTH];
     strcpy(cmd, cmd_line);
     Command* temp= nullptr;
-    if ((num_of_args >= 3 && ((strcmp(args[num_of_args-2], ">") == 0) || (strcmp(args[num_of_args-2],">>") == 0)))
-    ||(num_of_args >=4 && ((strcmp(args[num_of_args-3], ">") == 0) || (strcmp(args[num_of_args-3],">>") == 0)))){
-        string file_path = args[num_of_args-1];
-
-        temp = new RedirectionCommand(cmd);
+    int arrow_pos=NO_ARROW;
+    if (_isRedirectionCommand(cmd_line,&arrow_pos)){
+            temp = new RedirectionCommand(cmd,arrow_pos);
     }
     else if ("chprompt" == command){
         temp = new ChangePromptCommand(cmd, &prompt);
@@ -709,8 +705,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line){
     else{
         temp = new ExternalCommand(cmd);
     }
-    for(int i=0;i<num_of_args;i++)
-        free(args[i]);
+    FREE_PARSE();
     return temp;
 }
 
@@ -726,7 +721,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
             exit(0);
         }
         delete cmd;
-    } else if (dynamic_cast<ExternalCommand *>(cmd) != nullptr) {
+    } else if (dynamic_cast<ExternalCommand*>(cmd) != nullptr) {
             pid_t pid = fork();
             if (pid == 0) {
                 setpgrp();

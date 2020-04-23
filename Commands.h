@@ -16,8 +16,10 @@ using std::ostream;
 enum Status{
     Running,
     Stopped,
-    Finished
 };
+
+bool _isRedirectionCommand(const char* cmd_line);
+int sendToBash(const char* cmd_line);
 
 class Command {
 protected:
@@ -26,23 +28,13 @@ public:
     explicit Command(const char* cmd_line) : cmd_line(cmd_line){}
     virtual ~Command() {delete[] cmd_line;}
     virtual void execute() = 0;
-    //virtual void prepare();
-    //virtual void cleanup();
     const char* getCommandLine() const {return cmd_line;}
-    // TODO: Add your extra methods if needed
 };
 
 class BuiltInCommand : public Command {
 public:
     explicit BuiltInCommand(const char* cmd_line): Command(cmd_line){}
     ~BuiltInCommand() override =default;
-};
-
-class ExternalCommand : public Command {
-public:
-    explicit ExternalCommand(const char* cmd_line): Command(cmd_line){}
-    ~ExternalCommand() override = default;
-    void execute() override;
 };
 
 class PipeCommand : public Command {
@@ -59,19 +51,25 @@ class RedirectionCommand : public Command {
     bool single_arrow;
     bool background;
 public:
-    explicit RedirectionCommand(const char* cmd_line);
+    explicit RedirectionCommand(const char* cmd_line,int arrow_pos);
     ~RedirectionCommand() override = default;
     void execute() override;
     string getInternal() const {return internal_cmd_line;}
-  //void prepare() override;
-  //void cleanup() override;
 };
 
-class ChangeDirCommand : public BuiltInCommand {
-    char** plastPwd;
+class ChangePromptCommand : public BuiltInCommand {
+    string* new_prompt;
 public:
-    ChangeDirCommand(const char* cmd_line, char** plastPwd): BuiltInCommand(cmd_line), plastPwd(plastPwd){}
-    ~ChangeDirCommand() override = default;
+    ChangePromptCommand(const char* cmd_line,string* prompt) :
+            BuiltInCommand(cmd_line),new_prompt(prompt){}
+    ~ChangePromptCommand() override = default;
+    void execute() override;
+};
+
+class ShowPidCommand : public BuiltInCommand {
+public:
+    explicit ShowPidCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
+    ~ShowPidCommand() override = default;
     void execute() override;
 };
 
@@ -82,19 +80,11 @@ public:
     void execute() override;
 };
 
-class ShowPidCommand : public BuiltInCommand {
+class ChangeDirCommand : public BuiltInCommand {
+    char** plastPwd;
 public:
-   explicit ShowPidCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
-    ~ShowPidCommand() override = default;
-    void execute() override;
-};
-
-class JobsList;
-class QuitCommand : public BuiltInCommand {
-    JobsList* jobs;
-public:
-    QuitCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line),jobs(jobs){}
-    ~QuitCommand() override = default;
+    ChangeDirCommand(const char* cmd_line, char** plastPwd): BuiltInCommand(cmd_line), plastPwd(plastPwd){}
+    ~ChangeDirCommand() override = default;
     void execute() override;
 };
 
@@ -177,21 +167,25 @@ public:
     void execute() override;
 };
 
+class QuitCommand : public BuiltInCommand {
+    JobsList* jobs;
+public:
+    QuitCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line),jobs(jobs){}
+    ~QuitCommand() override = default;
+    void execute() override;
+};
+
+class ExternalCommand : public Command {
+public:
+    explicit ExternalCommand(const char* cmd_line): Command(cmd_line){}
+    ~ExternalCommand() override = default;
+    void execute() override;
+};
+
 class CopyCommand : public ExternalCommand {
 public:
     explicit CopyCommand(const char* cmd_line) :ExternalCommand(cmd_line){}
     ~CopyCommand() override = default;
-    void execute() override;
-};
-
-// TODO: add more classes if needed 
-// maybe chprompt , timeout ?
-class ChangePromptCommand : public BuiltInCommand {
-    string* new_prompt;
-public:
-    ChangePromptCommand(const char* cmd_line,string* prompt) :
-    BuiltInCommand(cmd_line),new_prompt(prompt){}
-    ~ChangePromptCommand() override = default;
     void execute() override;
 };
 
