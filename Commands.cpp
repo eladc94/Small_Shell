@@ -292,19 +292,13 @@ void ForegroundCommand::execute() {
         FREE_PARSE();
         return;
     }
-    if (kill(pid, SIGCONT) == SYSCALL_ERROR) {
+    if (kill(-1*pid, SIGCONT) == SYSCALL_ERROR) {
         perror("smash error: kill failed");
         FREE_PARSE();
         return;
     }
     else{
             jobs->setForeground(pid);
-            int temp;
-            pid_t gpd = getpgid(pid);
-            if (_isRedirectionOrPipe(jobs->getJobByPid(pid)->getJobCommandLine(), &temp,'|')) {
-                jobs->setFgPipe(true);
-                killpg(gpd,SIGCONT);
-            }
             int status;
             if (SYSCALL_ERROR == waitpid(pid, &status, WUNTRACED)) {
                 perror("smash error: waitpid failed");
@@ -314,7 +308,6 @@ void ForegroundCommand::execute() {
             if (!WIFSTOPPED(status))
                 jobs->removeJobById(job_id);
             jobs->setForeground(-1);
-            jobs->setFgPipe(false);
     }
     FREE_PARSE();
 }
@@ -345,21 +338,16 @@ void BackgroundCommand::execute() {
         if(pid == PID_NOT_EXIST){
             cerr <<"smash error: bg: job-id "<<job_id<<" does not exist"<< endl;
             flag=true;
-        }else {
+        }
+        else {
             job = jobs->getJobById(job_id);
             if (job->getStatus() == Running) {
                 cerr<<"smash error: bg: job-id " <<job_id << " is already running in the background" << endl;
                 flag=true;
             }
-            else if (kill(pid, SIGCONT) == SYSCALL_ERROR) {
+            else if (kill(-1*pid, SIGCONT) == SYSCALL_ERROR) {
                 perror("smash error: kill failed");
                 flag=true;
-            }
-            int temp;
-            pid_t gpd = getpgid(pid);
-            if (_isRedirectionOrPipe(jobs->getJobByPid(pid)->getJobCommandLine(), &temp,'|')) {
-                jobs->setFgPipe(true);
-                killpg(gpd, SIGCONT);
             }
         }
         if(flag){
@@ -375,7 +363,7 @@ void BackgroundCommand::execute() {
             return;
         }
         pid_t pid=jobs->getPidByJobID(job_id);
-        if(kill(pid,SIGCONT) == SYSCALL_ERROR){
+        if(kill(-1*pid,SIGCONT) == SYSCALL_ERROR){
             perror("smash error: kill failed");
             return;
         }
@@ -639,7 +627,7 @@ void JobsList::printForQuit() const{
 void JobsList::killAllJobs() {
     list<JobEntry>::iterator i;
     for(i=job_list.begin();i!=job_list.end();++i){
-        if(kill(i->pid,SIGKILL) == SYSCALL_ERROR)
+        if(kill(-1*(i->pid),SIGKILL) == SYSCALL_ERROR)
             perror("smash error: kill failed");
         else{
             if (SYSCALL_ERROR == waitpid(i->pid,NULL,0))
@@ -898,14 +886,15 @@ void PipeCommand::execute() {
         }
         else{
             close(my_pipe[0]);
-            signal(SIGINT,ctrlCPipeHandler);
-            signal(SIGTSTP, ctrlZPipeHandler);
-            //signal(SIGCONT, sigcontPipeHandler);
-            int status;
-            if (SYSCALL_ERROR == waitpid(left, &status, WUNTRACED))
-                perror("smash error: waitpid failed");
-            if (SYSCALL_ERROR == waitpid(right, &status, WUNTRACED))
-                perror("smash error: waitpid failed");
+            int left_stat, right_stat;
+            do {
+                if (SYSCALL_ERROR == waitpid(left, &left_stat, WUNTRACED))
+                    perror("smash error: waitpid failed");
+            }while (WIFSTOPPED(left_stat));
+            do {
+                if (SYSCALL_ERROR == waitpid(right, &right_stat, WUNTRACED))
+                    perror("smash error: waitpid failed");
+            }while (WIFSTOPPED(right_stat));
             return;
         }
     }
