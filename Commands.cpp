@@ -147,7 +147,7 @@ void ShowPidCommand::execute() {
 void GetCurrDirCommand::execute() {
     char* path = get_current_dir_name(); //change to current_dir....
     if (NULL == path){
-        perror("smash error: get_current_dir_name failed");
+        cerr<<"smash error: get_current_dir_name failed"<<endl;
         return;
     }
     std::cout << path << std::endl;
@@ -161,26 +161,25 @@ void ChangeDirCommand::execute() {
     _removeBackgroundSign(cmd_no_ampersand);
     int numOfArgs = _parseCommandLine(cmd_no_ampersand, args);
     if (numOfArgs > CHDIR_MAX_ARG){
-        perror("smash error: cd: too many arguments");
+       cerr<<"smash error: cd: too many arguments"<<endl;
         FREE_PARSE();
         return;
     }
     if(numOfArgs<=1) {
-        for(int i=0;i<numOfArgs;i++)
-            free(args[i]);
+        FREE_PARSE();
         return;
     }
     //at this points,numofargs=2
     char* curr = get_current_dir_name();
     if(NULL == curr){
-        perror("smash error: get_current_dir_name failed");
+        cerr<<"smash error: get_current_dir_name failed"<<endl;
         FREE_PARSE();
         return;
     }
     char * dst;
     if (strcmp(args[1],CHDIR_PREV) == 0) { // if "-" was sent
         if (NULL == *plastPwd) {
-            perror("smash error: cd: OLDPWD not set");
+            cerr<<"smash error: cd: OLDPWD not set"<<endl;
             free(curr);
             FREE_PARSE();
             return;
@@ -213,7 +212,7 @@ void KillCommand::execute() {
     _removeBackgroundSign(cmd_no_ampersand);
     int numOfArgs = _parseCommandLine(cmd_no_ampersand, args);
     if (numOfArgs != KILL_ARGS){
-        perror("smash error: kill: invalid arguments");
+        cerr<<"smash error: kill: invalid arguments"<<endl;
         FREE_PARSE();
         return;
     }
@@ -223,20 +222,19 @@ void KillCommand::execute() {
         job_id = stoi(args[KILL_JOB_ARG], nullptr);
     }
     catch(const std::invalid_argument& ie){
-        perror("smash error: kill: invalid arguments");
+        cerr<<"smash error: kill: invalid arguments"<<endl;
         FREE_PARSE();
         return;
     }
     sig = sig*(-1);
     if(sig<MIN_SIG_NUM||sig>MAX_SIG_NUM){
-        perror("smash error: kill: invalid arguments");
+        cerr<<"smash error: kill: invalid arguments"<<endl;
         FREE_PARSE();
         return;
     }
     pid_t pid = jobs->getPidByJobID(job_id);
     if(PID_NOT_EXIST == pid){
-        string error_msg="smash error: kill: job-id "+to_string(job_id)+" does not exist";
-        perror(error_msg.c_str());
+        cerr<<"smash error: kill: job-id "<<job_id<<" does not exist"<<endl;
         FREE_PARSE();
         return;
     }
@@ -260,7 +258,7 @@ void ForegroundCommand::execute() {
     int job_id = DOES_NOT_EXIST;
     bool flag = false;
     if (numOfArgs > BFG_ARGS){
-        perror("smash error: fg: invalid arguments");
+        cerr<<"smash error: fg: invalid arguments"<<endl;
         flag = true;
     }
     else if (numOfArgs == BFG_ARGS) {
@@ -268,14 +266,13 @@ void ForegroundCommand::execute() {
             job_id = stoi(args[BFG_JOB_ARG], nullptr);
         }
         catch (const std::invalid_argument& ia){
-            perror("smash error: fg: invalid arguments");
+            cerr<<"smash error: fg: invalid arguments"<<endl;
             FREE_PARSE();
             return;
         }
         pid = jobs->getPidByJobID(job_id);
         if (pid == PID_NOT_EXIST){
-            string error_msg = "smash error: fg: job-id " + to_string(job_id) + " does not exists";
-            perror(error_msg.c_str());
+            cerr<<"smash error: fg: job-id "<<job_id<< " does not exists"<<endl;
             flag = true;
         }
     }
@@ -283,7 +280,7 @@ void ForegroundCommand::execute() {
         job_id = jobs->getMaxJobId();
         pid = jobs->getPidByJobID(job_id);
         if (pid == PID_NOT_EXIST) {
-            perror("smash error: fg: jobs list is empty");
+            cerr<<"smash error: fg: jobs list is empty"<<endl;
             flag = true;
         }
     }
@@ -318,7 +315,7 @@ void BackgroundCommand::execute() {
     int job_id = DOES_NOT_EXIST;
     if(numOfArgs > BFG_ARGS){
         FREE_PARSE();
-        perror("smash error: bg: invalid arguments");
+        cerr<<"smash error: bg: invalid arguments"<<endl;
         return;
     }
     else if(numOfArgs == BFG_ARGS){
@@ -326,7 +323,7 @@ void BackgroundCommand::execute() {
             job_id=stoi(args[BFG_JOB_ARG], nullptr);
         }
         catch (const std::invalid_argument& ia){
-            perror("smash error: bg: invalid arguments");
+            cerr<<"smash error: bg: invalid arguments"<<endl;
             FREE_PARSE();
             return;
         }
@@ -334,14 +331,12 @@ void BackgroundCommand::execute() {
         pid_t pid=jobs->getPidByJobID(job_id);
         JobsList::JobEntry *job= nullptr;
         if(pid == PID_NOT_EXIST){
-            string error="smash error: bg: job-id " + to_string(job_id)+" does not exist";
-            perror(error.c_str());
+            cerr <<"smash error: bg: job-id "<<job_id<<" does not exist"<< endl;
             flag=true;
         }else {
             job = jobs->getJobById(job_id);
             if (job->getStatus() == Running) {
-                string error = "smash error: bg: job-id " + to_string(job_id) + " is already running in the background";
-                perror(error.c_str());
+                cerr<<"smash error: bg: job-id " <<job_id << " is already running in the background" << endl;
                 flag=true;
             }
             else if (kill(pid, SIGCONT) == SYSCALL_ERROR) {
@@ -358,7 +353,7 @@ void BackgroundCommand::execute() {
     else{
         JobsList::JobEntry* job = jobs->getLastStoppedJob(&job_id);
         if(nullptr == job){
-            perror("smash error: bg: there is no stopped jobs to resume");
+            cerr << "smash error: bg: there is no stopped jobs to resume" << endl;
             return;
         }
         pid_t pid=jobs->getPidByJobID(job_id);
@@ -435,29 +430,30 @@ void RedirectionCommand::execute() {
     char internal_copy[COMMAND_ARGS_MAX_LENGTH];
     strcpy(internal_copy, internal_cmd_line.c_str());
     Command *internal_cmd = smash.CreateCommand(internal_copy);
+    int new_fd=dup(STDOUT_FD);
     close(STDOUT_FD);
     int fd;
     if (single_arrow)
         fd = open(file_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC,OPEN_MODE);
     else
         fd = open(file_name.c_str(), O_WRONLY | O_CREAT | O_APPEND,OPEN_MODE);
-    if (dynamic_cast<BuiltInCommand*>(internal_cmd) != nullptr) {
-        internal_cmd->execute(); //can assume no & sign
+    if(dynamic_cast<BuiltInCommand*>(internal_cmd) != nullptr){
+        internal_cmd->execute();
+        delete internal_cmd;
         close(fd);
-        delete internal_cmd;
-        return;
+        dup2(new_fd,STDOUT_FD);
+        close(new_fd);
     }
-    else if (dynamic_cast<ExternalCommand *>(internal_cmd) != nullptr) {
+    else {
         delete internal_cmd;
-        int flag = sendToBash(internal_copy);
-        if (flag == SYSCALL_ERROR) {
+        int flag=sendToBash(internal_copy);
+        if(flag == SYSCALL_ERROR){
             perror("smash error: execv failed");
-            close(fd);
             exit(0);
-        };
-        return;
+        }
     }
 }
+//TODO: maybe move the "copied" text
 void CopyCommand::execute() {
     char* args[COMMAND_MAX_ARGS];
     char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
@@ -495,6 +491,7 @@ void CopyCommand::execute() {
         FREE_PARSE();
         return;
     }
+    cout<<"smash: "<<src_name<<" was copied to "<<dst_name<<endl;
     int flag1=close(fd_write);
     int flag2=close(fd_read);
    if(flag1 == SYSCALL_ERROR || flag2==SYSCALL_ERROR) {
@@ -569,7 +566,6 @@ void JobsList::removeJobById(int jobId) {
         }
 }
 
-
 void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
     this->removeFinishedJobs();
     if(!isStopped) {
@@ -577,10 +573,6 @@ void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
         JobEntry new_job = JobEntry(cmd, new_job_id, pid);
         job_list.push_back(new_job);
     }
-    //stopping
-    /*else{
-
-    }*/
 }
 
 void JobsList::removeFinishedJobs() {
@@ -754,26 +746,25 @@ void SmallShell::executeCommand(const char *cmd_line) {
                 }
         }
     } else if (dynamic_cast<RedirectionCommand *>(cmd) != nullptr) {
-        pid_t pid = fork();
-        if(pid == 0) {
-            setpgrp();
+        auto temp = dynamic_cast<RedirectionCommand*>(cmd);
+        string internal_cmd_line = temp->getInternal();
+        Command *internal_cmd = CreateCommand(internal_cmd_line.c_str());
+        if (dynamic_cast<BuiltInCommand *>(internal_cmd) != nullptr) {
             cmd->execute();
-            delete cmd;
-            exit(0);
         }
-        else{
-            auto temp= dynamic_cast<RedirectionCommand*>(cmd);
-            string internal_cmd_line=temp->getInternal();
-            Command* internal_cmd=CreateCommand(internal_cmd_line.c_str());
-            if(dynamic_cast<BuiltInCommand*>(internal_cmd) != nullptr) {
-                if(SYSCALL_ERROR == waitpid(pid, NULL, 0))
-                    perror("smash error: waitpid failed");
+        else {
+            pid_t pid = fork();
+            if (pid == 0) {
+                setpgrp();
+                cmd->execute();
                 delete cmd;
+                delete internal_cmd;
+                exit(0);
             }
-            else if(dynamic_cast<ExternalCommand*>(internal_cmd) != nullptr){
-                bool background=_isBackgroundCommand(cmd_line);
-                if(background){
-                    jobs.addJob(cmd,pid);
+            else {
+                bool background = _isBackgroundCommand(cmd_line);
+                if (background) {
+                    jobs.addJob(cmd, pid);
                 }
                 else {
                     jobs.setForeground(pid);
@@ -787,8 +778,8 @@ void SmallShell::executeCommand(const char *cmd_line) {
                     jobs.setForeground(-1);
                 }
             }
-            delete internal_cmd;
         }
+        delete internal_cmd;
     }
 }
 JobsList *SmallShell::getJobList() {

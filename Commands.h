@@ -208,6 +208,7 @@ public:
   void executeCommand(const char* cmd_line);
   string getPrompt() const {return prompt;}
   JobsList* getJobList();
+  pid_t getPid() const {return smash_pid;}
   // TODO: add extra methods as needed
 };
 
