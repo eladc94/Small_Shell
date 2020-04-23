@@ -410,13 +410,23 @@ internal_cmd_line(""),single_arrow(true), background(false){
     int numOfArgs = _parseCommandLine(cmd, args);
     for(int i=0;i<arrow_pos;i++)
         internal_cmd_line.push_back(cmd[i]);
-    if(arrow_pos<strlen(cmd)-1)
+    int len=strlen(cmd);
+    if(arrow_pos<len-1)
         if(cmd[arrow_pos+1]=='>'){
             single_arrow = false;
             arrow_pos++;
         }
-    for(int i=arrow_pos+1;i<strlen(cmd);i++)
+    for(int i=arrow_pos+1;i<len;i++)
         file_name.push_back(cmd[i]);
+    char* file_name_args[COMMAND_MAX_ARGS];
+    int numOfFileArgs = _parseCommandLine(file_name.c_str(),file_name_args);
+    if(numOfFileArgs == 0)
+        file_name="";
+    else
+        file_name=file_name_args[0];
+    for(int i =0;i<numOfFileArgs;i++){
+        free(file_name_args[i]);
+    }
     FREE_PARSE();
 }
 
