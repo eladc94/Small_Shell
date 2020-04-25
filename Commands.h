@@ -125,7 +125,6 @@ public:
     JobEntry * getJobByPid(int pid);
     pid_t getPidByJobID(int job_id);
     JobEntry *getLastStoppedJob(int *jobId);
-    //JobEntry * getLastJob(int* lastJobId);
     void removeJobById(int jobId);
     int getMaxJobId() const;
     void setForeground(pid_t pid){foreground=pid;}
@@ -191,9 +190,34 @@ public:
     void execute() override;
 };
 
+class TimeoutJobEntry {
+    pid_t pid;
+    time_t kill_time;
+public:
+    TimeoutJobEntry(pid_t pid, time_t kill_time) : pid(pid), kill_time(kill_time) {}
+    ~TimeoutJobEntry() = default;
+    pid_t getPid() const{return pid;}
+    friend bool operator==(const TimeoutJobEntry& t1,const TimeoutJobEntry& t2);
+    friend bool operator!=(const TimeoutJobEntry& t1,const TimeoutJobEntry& t2);
+    friend bool operator<(const TimeoutJobEntry& t1,const TimeoutJobEntry& t2);
+};
+
+class TimeoutCommand : public Command{
+    time_t kill_time;
+    int duration;
+public:
+    explicit TimeoutCommand(const char* cmd_line,int duration) : Command(cmd_line),
+    kill_time(time(NULL)+duration),duration(duration){}
+    ~TimeoutCommand() override = default;
+    void execute() override;
+    time_t getKillTime() const {return kill_time;}
+    int getDuration() const {return duration;}
+};
+
 class SmallShell {
 private:
     JobsList jobs;
+    list<TimeoutJobEntry> timeout_list;
     pid_t smash_pid;
     string prompt;
     char* previous_path;
@@ -209,7 +233,8 @@ public:
   ~SmallShell();
   void executeCommand(const char* cmd_line);
   string getPrompt() const {return prompt;}
-  JobsList* getJobList();
+  JobsList* getJobList(){return &jobs;}
+  list<TimeoutJobEntry>* getTimeoutList(){return &timeout_list;}
   pid_t getPid() const {return smash_pid;}
   // TODO: add extra methods as needed
 };

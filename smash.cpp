@@ -14,11 +14,14 @@ int main(int argc, char* argv[]) {
     }
 
     //TODO: setup sig alarm handler
-
     SmallShell& smash = SmallShell::getInstance();
+    struct sigaction alarm_handler;
+    alarm_handler.sa_handler=alarmHandler;
+    alarm_handler.sa_flags=SA_RESTART;
+    if(sigaction(SIGALRM,&alarm_handler,NULL) == -1){
+        perror("smash error: failed to set alarm handler");
+    }
     while(true) {
-        signal(SIGTSTP, ctrlZHandler);
-        signal(SIGINT, ctrlCHandler);
         std::cout << smash.getPrompt();
         std::string cmd_line;
         std::getline(std::cin, cmd_line);
