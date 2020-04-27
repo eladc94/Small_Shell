@@ -233,7 +233,7 @@ void KillCommand::execute() {
         return;
     }
     sig = sig*(-1);
-    if(sig<MIN_SIG_NUM||sig>MAX_SIG_NUM){
+    if(sig < MIN_SIG_NUM || sig > MAX_SIG_NUM || job_id < 1){
         cerr<<"smash error: kill: invalid arguments"<<endl;
         FREE_PARSE();
         return;
@@ -272,6 +272,11 @@ void ForegroundCommand::execute() {
             job_id = stoi(args[BFG_JOB_ARG], nullptr);
         }
         catch (const std::invalid_argument& ia){
+            cerr<<"smash error: fg: invalid arguments"<<endl;
+            FREE_PARSE();
+            return;
+        }
+        if (job_id < 1){
             cerr<<"smash error: fg: invalid arguments"<<endl;
             FREE_PARSE();
             return;
@@ -332,6 +337,11 @@ void BackgroundCommand::execute() {
             job_id=stoi(args[BFG_JOB_ARG], nullptr);
         }
         catch (const std::invalid_argument& ia){
+            cerr<<"smash error: bg: invalid arguments"<<endl;
+            FREE_PARSE();
+            return;
+        }
+        if (job_id < 1){
             cerr<<"smash error: bg: invalid arguments"<<endl;
             FREE_PARSE();
             return;
@@ -400,9 +410,10 @@ void QuitCommand::execute() {
         for (int i = 1; i<numOfArgs; ++i)
             if (strcmp(args[i],"kill") == 0)
                 kill = true;
-    if(kill)
+    if(kill) {
         jobs->printForQuit();
-    jobs->killAllJobs();
+        jobs->killAllJobs();
+    }
     FREE_PARSE();
 }
 
@@ -526,7 +537,7 @@ void CopyCommand::execute() {
     cout<<"smash: "<<src_name<<" was copied to "<<dst_name<<endl;
     int flag1=close(fd_write);
     int flag2=close(fd_read);
-   if(flag1 == SYSCALL_ERROR || flag2==SYSCALL_ERROR) {
+    if(flag1 == SYSCALL_ERROR || flag2==SYSCALL_ERROR) {
        perror("smash error: close failed");
     }
     FREE_PARSE();
@@ -792,8 +803,6 @@ SmallShell::SmallShell() : jobs(JobsList()),smash_pid(getpid()),prompt("smash> "
         previous_path(nullptr) {}
 
 SmallShell::~SmallShell() {
-    if(getpid() == smash_pid)
-        jobs.killAllJobs();
     delete[] previous_path;
 }
 
@@ -802,7 +811,10 @@ SmallShell::~SmallShell() {
 */
 Command * SmallShell::CreateCommand(const char* cmd_line){
     char* args[MAX_ARGUMENTS];
-    int numOfArgs = _parseCommandLine(cmd_line, args);
+    char cmd_copy[COMMAND_ARGS_MAX_LENGTH];
+    strcpy(cmd_copy, cmd_line);
+    _removeBackgroundSign(cmd_copy);
+    int numOfArgs = _parseCommandLine(cmd_copy, args);
     string command(args[0]);
     char* cmd = new char[COMMAND_ARGS_MAX_LENGTH];
     strcpy(cmd, cmd_line);

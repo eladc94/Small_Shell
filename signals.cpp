@@ -46,12 +46,12 @@ void alarmHandler(int sig_num) {
     TimeoutJobEntry& entry=smash.getTimeoutList()->front();
     pid_t pid=entry.getPid();
     JobsList::JobEntry* job=jobs_list->getJobByPid(pid);
+    cout<<"smash: got an alarm"<<endl;
     if(job != nullptr){
         if (-1 == kill(-1*pid,SIGKILL)) {
             perror("smash error: kill failed");
             return;
         }
-        cout<<"smash: got an alarm"<<endl;
         cout<<"smash: "<<job->getJobCommandLine()<<" timed out!"<<endl;
     }
     smash.getTimeoutList()->pop_front();
