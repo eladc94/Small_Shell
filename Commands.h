@@ -203,13 +203,14 @@ public:
 };
 
 class TimeoutCommand : public Command{
+    string internal_cmd_line;
     time_t kill_time;
     int duration;
 public:
-    explicit TimeoutCommand(const char* cmd_line,int duration) : Command(cmd_line),
-    kill_time(time(NULL)+duration),duration(duration){}
+    explicit TimeoutCommand(const char* cmd_line,int duration);
     ~TimeoutCommand() override = default;
-    void execute() override;
+    void execute() override {}
+    const char* getInternal() const{return internal_cmd_line.c_str();}
     time_t getKillTime() const {return kill_time;}
     int getDuration() const {return duration;}
 };

@@ -41,7 +41,9 @@ void ctrlCHandler(int sig_num) {
 void alarmHandler(int sig_num) {
     SmallShell& smash=SmallShell::getInstance();
     JobsList* jobs_list=smash.getJobList();
-    TimeoutJobEntry& entry=smash.getTimeoutList()->back();
+    jobs_list->removeFinishedJobs();
+    smash.getTimeoutList()->sort();
+    TimeoutJobEntry& entry=smash.getTimeoutList()->front();
     pid_t pid=entry.getPid();
     JobsList::JobEntry* job=jobs_list->getJobByPid(pid);
     if(job!= nullptr){
@@ -52,5 +54,5 @@ void alarmHandler(int sig_num) {
         cout<<"smash: got an alarm"<<endl;
         cout<<"smash: "<<job->getJobCommandLine()<<" timed out!"<<endl;
     }
-    smash.getTimeoutList()->pop_back();
+    smash.getTimeoutList()->pop_front();
 }
