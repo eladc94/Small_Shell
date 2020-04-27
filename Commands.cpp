@@ -555,7 +555,7 @@ void PipeCommand::execute() {
     pipe(my_pipe);
     SmallShell& smash = SmallShell::getInstance();
     pid_t left = fork();
-    if (-1 == left){
+    if (SYSCALL_ERROR == left){
         perror("smash error: fork failed");
         return;
     }
@@ -578,7 +578,7 @@ void PipeCommand::execute() {
         if(close(my_pipe[1]) == SYSCALL_ERROR)
             perror("smash error: close failed");
         pid_t right = fork();
-        if (-1 == right) {
+        if (SYSCALL_ERROR == right) {
             perror("smash error: fork failed");
             return;
         }
@@ -990,7 +990,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
     }
     else if (dynamic_cast<PipeCommand *>(toExecute) != nullptr) {
         pid_t pid = fork();
-        if (-1 == pid) {
+        if (SYSCALL_ERROR == pid) {
             perror("smash error: fork failed");
             delete cmd;
             delete timeout_internal;
