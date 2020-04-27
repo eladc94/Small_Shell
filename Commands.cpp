@@ -302,10 +302,12 @@ void ForegroundCommand::execute() {
     else{
             jobs->setForeground(pid);
             int status;
-            if (SYSCALL_ERROR == waitpid(pid, &status, WUNTRACED)) {
-                perror("smash error: waitpid failed");
-                FREE_PARSE();
-                return;
+            if(getpid() == SmallShell::getInstance().getPid()) {
+                if (SYSCALL_ERROR == waitpid(pid, &status, WUNTRACED)) {
+                    perror("smash error: waitpid failed");
+                    FREE_PARSE();
+                    return;
+                }
             }
             if (!WIFSTOPPED(status))
                 jobs->removeJobById(job_id);
@@ -881,11 +883,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
     time_t timeout_kill_time=-1;
     if(dynamic_cast<TimeoutCommand*>(cmd) != nullptr){
         auto temp = dynamic_cast<TimeoutCommand*>(cmd);
-        if(alarm(temp->getDuration())== SYSCALL_ERROR){
-            perror("smash error: alarm failed");
-            delete cmd;
-            return;
-        }
+        alarm(temp->getDuration());
         timeout_internal = CreateCommand(temp->getInternal());
         toExecute = timeout_internal;
         isTimeout=true;
