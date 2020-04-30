@@ -519,10 +519,17 @@ void CopyCommand::execute() {
     int numOfArgs=_parseCommandLine(cmd_no_ampersand,args);
     string src_name=args[COPY_SRC_ARG];
     string dst_name=args[COPY_DST_ARG];
-    if(src_name==dst_name) {
+    char* real_src_path=realpath(src_name.c_str(),NULL);
+    char* real_dst_path=realpath(dst_name.c_str(),NULL);
+    if(real_src_path != NULL && real_dst_path != NULL && strcmp(real_src_path,real_dst_path) == 0)
+    {
         cout<<"smash: "<<src_name<<" was copied to "<<dst_name<<endl;
+        free(real_src_path);
+        free(real_dst_path);
         return;
     }
+    free(real_src_path);
+    free(real_dst_path);
     int fd_read=open(src_name.c_str(), O_RDONLY,OPEN_MODE);
     int fd_write=open(dst_name.c_str(), O_WRONLY|O_CREAT|O_TRUNC,OPEN_MODE);
     if( fd_read == SYSCALL_ERROR || fd_write == SYSCALL_ERROR){
