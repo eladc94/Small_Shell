@@ -197,6 +197,7 @@ public:
     TimeoutJobEntry(pid_t pid, time_t kill_time) : pid(pid), kill_time(kill_time) {}
     ~TimeoutJobEntry() = default;
     pid_t getPid() const{return pid;}
+    time_t getKillTime() const{return kill_time;}
     friend bool operator==(const TimeoutJobEntry& t1,const TimeoutJobEntry& t2);
     friend bool operator!=(const TimeoutJobEntry& t1,const TimeoutJobEntry& t2);
     friend bool operator<(const TimeoutJobEntry& t1,const TimeoutJobEntry& t2);
@@ -237,7 +238,7 @@ public:
   JobsList* getJobList(){return &jobs;}
   list<TimeoutJobEntry>* getTimeoutList(){return &timeout_list;}
   pid_t getPid() const {return smash_pid;}
-  // TODO: add extra methods as needed
+  void setNewAlarm();
 };
 
 #endif //SMASH_COMMAND_H_

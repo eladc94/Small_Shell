@@ -129,6 +129,12 @@ int sendToBash(char* cmd_line){
     char* args[EXECV_ARRAY_SIZE]={(char*)"/bin/bash",(char*)"-c",cmd_line,NULL};
     return execv(args[0],args);
 }
+void SmallShell::setNewAlarm(){
+    if(this->timeout_list.empty())
+        return;
+    TimeoutJobEntry job = this->timeout_list.front();
+    alarm(job.getKillTime()-time(NULL));
+}
 
 void ChangePromptCommand::execute() {
     char* args[MAX_ARGUMENTS];
@@ -895,15 +901,17 @@ void SmallShell::executeCommand(const char *cmd_line) {
     time_t timeout_kill_time=-1;
     if(dynamic_cast<TimeoutCommand*>(cmd) != nullptr){
         auto temp = dynamic_cast<TimeoutCommand*>(cmd);
-        alarm(temp->getDuration());
         timeout_internal = CreateCommand(temp->getInternal());
         toExecute = timeout_internal;
         isTimeout=true;
         timeout_kill_time = temp->getKillTime();
     }
     if (dynamic_cast<BuiltInCommand *>(toExecute) != nullptr) {
-        if(isTimeout)
-            timeout_list.emplace_back(TimeoutJobEntry(PID_NOT_EXIST,timeout_kill_time));
+        if(isTimeout) {
+            timeout_list.emplace_back(TimeoutJobEntry(PID_NOT_EXIST, timeout_kill_time));
+            timeout_list.sort();
+            setNewAlarm();
+        }
         toExecute->execute();
         if (dynamic_cast<QuitCommand *>(toExecute) != nullptr) {
             delete cmd;
@@ -931,8 +939,11 @@ void SmallShell::executeCommand(const char *cmd_line) {
             exit(0);
         }
         else {
-            if(isTimeout)
+            if(isTimeout) {
                 timeout_list.emplace_back(TimeoutJobEntry(pid, timeout_kill_time));
+                timeout_list.sort();
+                setNewAlarm();
+            }
             if (_isBackgroundCommand(cmd_line))
                 jobs.addJob(cmd, pid);
             else {
@@ -952,8 +963,11 @@ void SmallShell::executeCommand(const char *cmd_line) {
         string internal_cmd_line = temp->getInternal();
         Command *internal_cmd = CreateCommand(internal_cmd_line.c_str());
         if (dynamic_cast<BuiltInCommand *>(internal_cmd) != nullptr) {
-            if(isTimeout)
-                timeout_list.emplace_back(TimeoutJobEntry(PID_NOT_EXIST,timeout_kill_time));
+            if(isTimeout) {
+                timeout_list.emplace_back(TimeoutJobEntry(PID_NOT_EXIST, timeout_kill_time));
+                timeout_list.sort();
+                setNewAlarm();
+            }
             toExecute->execute();
         }
         else {
@@ -975,8 +989,11 @@ void SmallShell::executeCommand(const char *cmd_line) {
                 exit(0);
             }
             else {
-                if(isTimeout)
+                if(isTimeout){
                     timeout_list.emplace_back(TimeoutJobEntry(pid, timeout_kill_time));
+                    timeout_list.sort();
+                    setNewAlarm();
+                }
                 if (_isBackgroundCommand(cmd_line))
                     jobs.addJob(cmd, pid);
                 else {
@@ -1016,8 +1033,11 @@ void SmallShell::executeCommand(const char *cmd_line) {
             exit(0);
         }
         else {
-            if(isTimeout)
+            if(isTimeout) {
                 timeout_list.emplace_back(TimeoutJobEntry(pid, timeout_kill_time));
+                timeout_list.sort();
+                setNewAlarm();
+            }
             if (_isBackgroundCommand(cmd_line)) {
                 jobs.addJob(cmd, pid);
             }

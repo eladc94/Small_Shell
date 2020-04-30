@@ -42,7 +42,6 @@ void alarmHandler(int sig_num) {
     SmallShell& smash=SmallShell::getInstance();
     JobsList* jobs_list=smash.getJobList();
     jobs_list->removeFinishedJobs();
-    smash.getTimeoutList()->sort();
     TimeoutJobEntry& entry=smash.getTimeoutList()->front();
     pid_t pid=entry.getPid();
     JobsList::JobEntry* job=jobs_list->getJobByPid(pid);
@@ -55,4 +54,5 @@ void alarmHandler(int sig_num) {
         cout<<"smash: "<<job->getJobCommandLine()<<" timed out!"<<endl;
     }
     smash.getTimeoutList()->pop_front();
+    smash.setNewAlarm();
 }
