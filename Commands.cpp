@@ -31,7 +31,7 @@ const int STDOUT_FD = 1;
 const int STDERR_FD = 2;
 const int PIPE_SIZE = 2;
 const int TIMEOUT_ARG = 2;
-const int READ_SIZE=1000;
+const int READ_SIZE=4000;
 
 const int KILL_SIG_ARG = 1;
 const int KILL_JOB_ARG = 2;
@@ -153,7 +153,7 @@ void ChangePromptCommand::execute() {
 
 void ShowPidCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
-    std::cout << "smash pid is: " << smash.getPid() << std::endl;
+    std::cout << "smash pid is " << smash.getPid() << std::endl;
 }
 
 void GetCurrDirCommand::execute() {
@@ -239,8 +239,13 @@ void KillCommand::execute() {
         return;
     }
     sig = sig*(-1);
-    if(sig < MIN_SIG_NUM || sig > MAX_SIG_NUM || job_id < 1){
+    if(sig < MIN_SIG_NUM || sig > MAX_SIG_NUM){
         cerr<<"smash error: kill: invalid arguments"<<endl;
+        FREE_PARSE();
+        return;
+    }
+    if(job_id<1){
+        cerr<<"smash error: kill: job-id "<<job_id<<" does not exist"<<endl;
         FREE_PARSE();
         return;
     }
@@ -283,13 +288,13 @@ void ForegroundCommand::execute() {
             return;
         }
         if (job_id < 1){
-            cerr<<"smash error: fg: invalid arguments"<<endl;
+            cerr<<"smash error: fg: job-id "<<job_id<< " does not exist"<<endl;
             FREE_PARSE();
             return;
         }
         pid = jobs->getPidByJobID(job_id);
         if (pid == PID_NOT_EXIST){
-            cerr<<"smash error: fg: job-id "<<job_id<< " does not exists"<<endl;
+            cerr<<"smash error: fg: job-id "<<job_id<< " does not exist"<<endl;
             flag = true;
         }
     }
@@ -312,6 +317,7 @@ void ForegroundCommand::execute() {
     }
     else{
             jobs->setForeground(pid);
+            cout <<jobs->getJobByPid(pid)->getJobCommandLine()<< " : "<<pid<<endl;
             int status;
             if(getpid() == SmallShell::getInstance().getPid()) {
                 if (SYSCALL_ERROR == waitpid(pid, &status, WUNTRACED)) {
@@ -348,7 +354,7 @@ void BackgroundCommand::execute() {
             return;
         }
         if (job_id < 1){
-            cerr<<"smash error: bg: invalid arguments"<<endl;
+            cerr <<"smash error: bg: job-id "<<job_id<<" does not exist"<< endl;
             FREE_PARSE();
             return;
         }
@@ -375,6 +381,7 @@ void BackgroundCommand::execute() {
             return;
         }
         job->setStatus(Running);
+        cout<< job->getJobCommandLine()<<" : "<<pid<<endl;
     }
     else{
         JobsList::JobEntry* job = jobs->getLastStoppedJob(&job_id);
@@ -390,6 +397,7 @@ void BackgroundCommand::execute() {
             return;
         }
         job->setStatus(Running);
+        cout<< job->getJobCommandLine()<<" : "<<pid<<endl;
     }
     FREE_PARSE();
 }
@@ -507,12 +515,15 @@ void CopyCommand::execute() {
     char* args[COMMAND_MAX_ARGS];
     char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
     strcpy(cmd_no_ampersand,cmd_line);
+    _removeBackgroundSign(cmd_no_ampersand);
     int numOfArgs=_parseCommandLine(cmd_no_ampersand,args);
     string src_name=args[COPY_SRC_ARG];
     string dst_name=args[COPY_DST_ARG];
-    if(src_name==dst_name)
+    if(src_name==dst_name) {
+        cout<<"smash: "<<src_name<<" was copied to "<<dst_name<<endl;
         return;
-    int fd_read=open(src_name.c_str(), O_RDONLY);
+    }
+    int fd_read=open(src_name.c_str(), O_RDONLY,OPEN_MODE);
     int fd_write=open(dst_name.c_str(), O_WRONLY|O_CREAT|O_TRUNC,OPEN_MODE);
     if( fd_read == SYSCALL_ERROR || fd_write == SYSCALL_ERROR){
         perror("smash error: open failed");
@@ -522,6 +533,26 @@ void CopyCommand::execute() {
     char read_string[READ_SIZE];
     bool read_error=false;
     int read_bits=read(fd_read,read_string,READ_SIZE);
+    if(read_bits>0) {
+        int write_bits = write(fd_write, read_string, read_bits);
+        if (write_bits == SYSCALL_ERROR) {
+            perror("smash error: write failed");
+            FREE_PARSE();
+            return;
+        }
+    }
+    if(close(fd_write) == SYSCALL_ERROR){
+        perror("smash error: close failed");
+        FREE_PARSE();
+        return;
+    }
+    fd_write=open(dst_name.c_str(), O_WRONLY|O_CREAT|O_APPEND,OPEN_MODE);
+    if(fd_write == SYSCALL_ERROR){
+        perror("smash error: open failed");
+        FREE_PARSE();
+        return;
+    }
+    read_bits=read(fd_read,read_string,READ_SIZE);
     if(read_bits == SYSCALL_ERROR)
        read_error=true;
     while(read_bits>0){
@@ -816,6 +847,8 @@ SmallShell::~SmallShell() {
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command * SmallShell::CreateCommand(const char* cmd_line){
+    if(strcmp(cmd_line,"") == 0)
+        return nullptr;
     char* args[MAX_ARGUMENTS];
     char cmd_copy[COMMAND_ARGS_MAX_LENGTH];
     strcpy(cmd_copy, cmd_line);
@@ -827,7 +860,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line){
     Command* temp= nullptr;
     int sign_pos=NO_ARROW;
     if("timeout" == command){
-        if(numOfArgs<TIMEOUT_ARG){
+        if(numOfArgs<=TIMEOUT_ARG){
             cerr<<"smash error: timeout: invalid arguments"<<endl;
             FREE_PARSE();
             return nullptr;
