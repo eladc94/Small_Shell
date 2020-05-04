@@ -238,12 +238,13 @@ void KillCommand::execute() {
         FREE_PARSE();
         return;
     }
-    sig = sig*(-1);
-    if(sig < MIN_SIG_NUM || sig > MAX_SIG_NUM){
+
+    if(sig >= 0){
         cerr<<"smash error: kill: invalid arguments"<<endl;
         FREE_PARSE();
         return;
     }
+    sig = sig*(-1);
     if(job_id<1){
         cerr<<"smash error: kill: job-id "<<job_id<<" does not exist"<<endl;
         FREE_PARSE();
@@ -510,7 +511,7 @@ void RedirectionCommand::execute() {
         }
     }
 }
-//TODO: maybe move the "copied" text
+
 void CopyCommand::execute() {
     char* args[COMMAND_MAX_ARGS];
     char cmd_no_ampersand[COMMAND_ARGS_MAX_LENGTH];
