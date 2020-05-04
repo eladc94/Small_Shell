@@ -238,7 +238,6 @@ void KillCommand::execute() {
         FREE_PARSE();
         return;
     }
-
     if(sig >= 0){
         cerr<<"smash error: kill: invalid arguments"<<endl;
         FREE_PARSE();
@@ -610,7 +609,10 @@ PipeCommand::PipeCommand(const char *cmd_line, int sign_pos) : Command(cmd_line)
 
 void PipeCommand::execute() {
     int my_pipe[PIPE_SIZE];
-    pipe(my_pipe);
+    if(pipe(my_pipe) == SYSCALL_ERROR){
+        perror("smash error: pipe failed");
+        return;
+    }
     SmallShell& smash = SmallShell::getInstance();
     pid_t left = fork();
     if (SYSCALL_ERROR == left){
